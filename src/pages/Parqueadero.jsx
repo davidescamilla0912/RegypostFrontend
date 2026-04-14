@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import parqueaderoService from '../services/parqueaderoService';
 import reservaService from '../services/reservaService';
+import { AppButton, DataTable, PageHeader } from '../components/ui';
+import '../components/ui/ui.css';
 
 function Parqueadero() {
     const [registros, setRegistros] = useState([]);
@@ -149,31 +151,45 @@ function Parqueadero() {
         }
     };
 
-    if (loading) return <p style={styles.loading}>Cargando parqueadero...</p>;
+    const columns = [
+        { key: 'id', label: 'ID' },
+        { key: 'placa', label: 'Placa' },
+        { key: 'entrada', label: 'Entrada' },
+        { key: 'salida', label: 'Salida' },
+        { key: 'habitacion', label: 'Habitacion' },
+        { key: 'valor', label: 'Valor' },
+        { key: 'estado', label: 'Estado' },
+        { key: 'acciones', label: 'Acciones' }
+    ];
+
+    if (loading) return <p className="page-loading">Cargando parqueadero...</p>;
 
     return (
-        <div style={styles.container}>
-            <div style={styles.header}>
-                <button style={styles.btnVolver} onClick={() => navigate('/dashboard')}>← Volver</button>
-                <h2 style={styles.titulo}>Parqueadero</h2>
-                <button style={styles.btnCrear} onClick={() => setMostrarFormulario(!mostrarFormulario)}>
-                    + Registrar Entrada
-                </button>
-            </div>
+        <div className="page-container">
+            <PageHeader
+                title="Parqueadero"
+                onBack={() => navigate('/dashboard')}
+                backLabel="← Volver"
+                actions={(
+                    <AppButton onClick={() => setMostrarFormulario(!mostrarFormulario)}>
+                        + Registrar Entrada
+                    </AppButton>
+                )}
+            />
 
             {mostrarFormulario && (
-                <div style={styles.formulario}>
-                    <h3 style={styles.formTitulo}>Nueva Entrada</h3>
-                    {error ? <p style={styles.error}>{error}</p> : null}
-                    <div style={styles.formGrid}>
-                        <input style={styles.input} placeholder="Placa *"
+                <div className="panel">
+                    <h3 className="panel-title">Nueva Entrada</h3>
+                    {error ? <p className="error-text">{error}</p> : null}
+                    <div className="form-grid form-grid--3">
+                        <input className="input-base" placeholder="Placa *"
                             value={formData.placa}
                             onChange={e => setFormData({ ...formData, placa: e.target.value })} />
-                        <input style={styles.input} type="datetime-local"
+                        <input className="input-base" type="datetime-local"
                             value={formData.hora_entrada}
                             onChange={e => setFormData({ ...formData, hora_entrada: e.target.value })} />
                         <select
-                            style={styles.input}
+                            className="select-base"
                             value={formData.reserva_id}
                             onChange={e => setFormData({ ...formData, reserva_id: e.target.value })}
                         >
@@ -184,123 +200,75 @@ function Parqueadero() {
                                 </option>
                             ))}
                         </select>
-                        <input style={styles.input} placeholder="Habitación ID (opcional)"
+                        <input className="input-base" placeholder="Habitacion ID (opcional)"
                             value={formData.habitacion_id}
                             onChange={e => setFormData({ ...formData, habitacion_id: e.target.value })} />
-                        <input style={styles.input} placeholder="Valor" type="number"
+                        <input className="input-base" placeholder="Valor" type="number"
                             value={formData.valor}
                             onChange={e => setFormData({ ...formData, valor: e.target.value })} />
-                        <input style={styles.input} placeholder="Notas"
+                        <input className="input-base" placeholder="Notas"
                             value={formData.notas}
                             onChange={e => setFormData({ ...formData, notas: e.target.value })} />
                     </div>
-                    <div style={styles.formAcciones}>
-                        <button style={styles.btnGuardar} onClick={registrarEntrada}>Registrar</button>
-                        <button style={styles.btnCancelar} onClick={() => setMostrarFormulario(false)}>Cancelar</button>
+                    <div className="form-actions">
+                        <AppButton variant="info" onClick={registrarEntrada}>Registrar</AppButton>
+                        <AppButton variant="danger" onClick={() => setMostrarFormulario(false)}>Cancelar</AppButton>
                     </div>
                 </div>
             )}
 
-            <div style={styles.filtros}>
+            <div className="toolbar">
                 {['todos', 'activos'].map(f => (
-                    <button key={f} style={{
-                        ...styles.btnFiltro,
-                        backgroundColor: filtro === f ? '#1a1a2e' : '#ddd',
-                        color: filtro === f ? 'white' : '#333'
-                    }} onClick={() => setFiltro(f)}>
+                    <AppButton
+                        key={f}
+                        size="sm"
+                        variant={filtro === f ? 'primary' : 'secondary'}
+                        onClick={() => setFiltro(f)}
+                    >
                         {f === 'todos' ? 'Todos' : 'Activos'}
-                    </button>
+                    </AppButton>
                 ))}
-                <input style={styles.inputBuscar} placeholder="Buscar por placa..."
+                <input className="input-base" style={{ flex: 1 }} placeholder="Buscar por placa..."
                     value={busquedaPlaca}
                     onChange={e => setBusquedaPlaca(e.target.value)}
                     onKeyPress={e => e.key === 'Enter' && buscarPlaca()} />
-                <button style={styles.btnBuscar} onClick={buscarPlaca}>Buscar</button>
+                <AppButton onClick={buscarPlaca}>Buscar</AppButton>
             </div>
 
-            <div style={styles.tableContainer}>
-                <table style={styles.tabla}>
-                    <thead>
-                        <tr style={styles.thead}>
-                            <th style={styles.th}>ID</th>
-                            <th style={styles.th}>Placa</th>
-                            <th style={styles.th}>Entrada</th>
-                            <th style={styles.th}>Salida</th>
-                            <th style={styles.th}>Habitación</th>
-                            <th style={styles.th}>Valor</th>
-                            <th style={styles.th}>Estado</th>
-                            <th style={styles.th}>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {registros.map(r => (
-                            <tr key={r.id} style={styles.tr}>
-                                <td style={styles.td}>#{r.id}</td>
-                                <td style={styles.td}><strong>{r.placa}</strong></td>
-                                <td style={styles.td}>{r.hora_entrada}</td>
-                                <td style={styles.td}>{r.hora_salida || '-'}</td>
-                                <td style={styles.td}>{r.habitacion_numero || '-'}</td>
-                                <td style={styles.td}>${r.valor?.toLocaleString()}</td>
-                                <td style={styles.td}>
-                                    <span style={{
-                                        ...styles.badge,
-                                        backgroundColor: r.hora_salida ? '#95a5a6' : '#2ecc71'
-                                    }}>
-                                        {r.hora_salida ? 'Salió' : 'Activo'}
-                                    </span>
-                                </td>
-                                <td style={styles.td}>
-                                    <div style={styles.acciones}>
-                                        {!r.hora_salida && (
-                                            <button style={styles.btnSalida}
-                                                onClick={() => registrarSalida(r.id)}>
-                                                Salida
-                                            </button>
-                                        )}
-                                        <button style={styles.btnEliminar}
-                                            onClick={() => eliminar(r.id)}>
-                                            Eliminar
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+            <DataTable
+                columns={columns}
+                data={registros}
+                rowKey="id"
+                renderCell={(r, column) => {
+                    if (column.key === 'id') return `#${r.id}`;
+                    if (column.key === 'placa') return <strong>{r.placa}</strong>;
+                    if (column.key === 'entrada') return r.hora_entrada;
+                    if (column.key === 'salida') return r.hora_salida || '-';
+                    if (column.key === 'habitacion') return r.habitacion_numero || '-';
+                    if (column.key === 'valor') return `$${r.valor?.toLocaleString()}`;
+                    if (column.key === 'estado') {
+                        return (
+                            <span className="badge" style={{ backgroundColor: r.hora_salida ? '#95a5a6' : '#2ecc71' }}>
+                                {r.hora_salida ? 'Salio' : 'Activo'}
+                            </span>
+                        );
+                    }
+                    if (column.key === 'acciones') {
+                        return (
+                            <div className="row-actions">
+                                {!r.hora_salida && (
+                                    <AppButton size="sm" onClick={() => registrarSalida(r.id)}>Salida</AppButton>
+                                )}
+                                <AppButton variant="danger" size="sm" onClick={() => eliminar(r.id)}>Eliminar</AppButton>
+                            </div>
+                        );
+                    }
+                    return '-';
+                }}
+                emptyMessage="No hay registros de parqueadero."
+            />
         </div>
     );
 }
-
-const styles = {
-    container: { padding: '20px', backgroundColor: '#f0f2f5', minHeight: '100vh' },
-    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-    titulo: { margin: 0, color: '#1a1a2e' },
-    loading: { textAlign: 'center', marginTop: '50px' },
-    formulario: { backgroundColor: 'white', borderRadius: '10px', padding: '20px', marginBottom: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' },
-    formTitulo: { margin: '0 0 15px 0', color: '#1a1a2e' },
-    formGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '15px' },
-    error: { margin: '0 0 12px 0', color: '#c0392b', fontSize: '13px' },
-    input: { padding: '10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' },
-    formAcciones: { display: 'flex', gap: '10px' },
-    btnGuardar: { padding: '10px 20px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    btnCancelar: { padding: '10px 20px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    filtros: { display: 'flex', gap: '10px', marginBottom: '20px', alignItems: 'center' },
-    btnFiltro: { padding: '8px 15px', border: 'none', borderRadius: '20px', cursor: 'pointer', fontSize: '13px' },
-    inputBuscar: { padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px', flex: 1 },
-    btnBuscar: { padding: '8px 15px', backgroundColor: '#1a1a2e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    btnVolver: { padding: '8px 15px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    btnCrear: { padding: '8px 15px', backgroundColor: '#1a1a2e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    tableContainer: { backgroundColor: 'white', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', overflow: 'auto' },
-    tabla: { width: '100%', borderCollapse: 'collapse' },
-    thead: { backgroundColor: '#1a1a2e' },
-    th: { padding: '12px 15px', color: 'white', textAlign: 'left', fontSize: '14px' },
-    tr: { borderBottom: '1px solid #eee' },
-    td: { padding: '12px 15px', fontSize: '14px', color: '#333' },
-    badge: { padding: '4px 10px', borderRadius: '20px', color: 'white', fontSize: '12px' },
-    acciones: { display: 'flex', gap: '5px' },
-    btnSalida: { padding: '5px 10px', backgroundColor: '#f39c12', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' },
-    btnEliminar: { padding: '5px 10px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }
-};
 
 export default Parqueadero;

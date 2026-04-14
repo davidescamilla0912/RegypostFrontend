@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import inventarioService from '../services/inventarioService';
+import { AppButton, PageHeader } from '../components/ui';
+import '../components/ui/ui.css';
 
 function Inventario() {
     const [productos, setProductos] = useState([]);
@@ -83,128 +85,133 @@ function Inventario() {
         }
     };
 
-    if (loading) return <p style={styles.loading}>Cargando inventario...</p>;
+    if (loading) return <p className="page-loading">Cargando inventario...</p>;
 
     return (
-        <div style={styles.container}>
-            <div style={styles.header}>
-                <button style={styles.btnVolver} onClick={() => navigate('/dashboard')}>← Volver</button>
-                <h2 style={styles.titulo}>Inventario</h2>
-                <button style={styles.btnCrear} onClick={() => setMostrarFormulario(!mostrarFormulario)}>
-                    + Nuevo Producto
-                </button>
-            </div>
+        <div className="page-container">
+            <PageHeader
+                title="Inventario"
+                onBack={() => navigate('/dashboard')}
+                backLabel="← Volver"
+                actions={(
+                    <AppButton onClick={() => setMostrarFormulario(!mostrarFormulario)}>
+                        + Nuevo Producto
+                    </AppButton>
+                )}
+            />
 
             {mostrarFormulario && (
-                <div style={styles.formulario}>
-                    <h3 style={styles.formTitulo}>Nuevo Producto</h3>
+                <div className="panel">
+                    <h3 className="panel-title">Nuevo Producto</h3>
                       <div>
-                        <label style={styles.label}>Nombre *</label>
-                        <input style={styles.input} placeholder="Nombre *"
+                        <label className="label">Nombre *</label>
+                        <input className="input-base full-width" placeholder="Nombre *"
                          value={formData.nombre}
                         onChange={e => setFormData({ ...formData, nombre: e.target.value })} />
                     </div>
                     <div>
-                        <label style={styles.label}>Categoría</label>
-                        <input style={styles.input} placeholder="Categoría"
+                        <label className="label">Categoria</label>
+                        <input className="input-base full-width" placeholder="Categoria"
                         value={formData.categoria}
                         onChange={e => setFormData({ ...formData, categoria: e.target.value })} />
                     </div>
                     <div>
-                        <label style={styles.label}>Precio unitario</label>
-                        <input style={styles.input} placeholder="Precio unitario" type="number"
+                        <label className="label">Precio unitario</label>
+                        <input className="input-base full-width" placeholder="Precio unitario" type="number"
                         value={formData.precio_unitario}
                         onChange={e => setFormData({ ...formData, precio_unitario: e.target.value })} />
                     </div>
                     <div>
-                        <label style={styles.label}>Stock mínimo</label>
-                        <input style={styles.input} placeholder="Stock mínimo" type="number"
+                        <label className="label">Stock minimo</label>
+                        <input className="input-base full-width" placeholder="Stock minimo" type="number"
                         value={formData.stock_minimo}
                         onChange={e => setFormData({ ...formData, stock_minimo: e.target.value })} />
                     </div>
                     <div>
-                        <label style={styles.label}>Stock inicial</label>
-                        <input style={styles.input} placeholder="Stock inicial" type="number"
+                        <label className="label">Stock inicial</label>
+                        <input className="input-base full-width" placeholder="Stock inicial" type="number"
                         value={formData.stock_inicial}
                         onChange={e => setFormData({ ...formData, stock_inicial: e.target.value })} />
                     </div>
-                    <div style={styles.formAcciones}>
-                        <button style={styles.btnGuardar} onClick={crearProducto}>Guardar</button>
-                        <button style={styles.btnCancelarForm} onClick={() => setMostrarFormulario(false)}>Cancelar</button>
+                    <div className="form-actions mt-10">
+                        <AppButton variant="info" onClick={crearProducto}>Guardar</AppButton>
+                        <AppButton variant="danger" onClick={() => setMostrarFormulario(false)}>Cancelar</AppButton>
                     </div>
                 </div>
             )}
 
             {mostrarMovimiento && (
-                <div style={styles.formulario}>
-                    <h3 style={styles.formTitulo}>Registrar Movimiento — {productoSeleccionado?.nombre}</h3>
-                    <div style={styles.formGrid}>
-                        <select style={styles.input}
+                <div className="panel">
+                    <h3 className="panel-title">Registrar Movimiento - {productoSeleccionado?.nombre}</h3>
+                    <div className="form-grid form-grid--2">
+                        <select className="select-base"
                             value={movData.tipo_movimiento}
                             onChange={e => setMovData({ ...movData, tipo_movimiento: e.target.value })}>
                             <option value="entrada">Entrada</option>
                             <option value="salida">Salida</option>
                             <option value="ajuste">Ajuste</option>
                         </select>
-                        <input style={styles.input} placeholder="Cantidad" type="number"
+                        <input className="input-base" placeholder="Cantidad" type="number"
                             value={movData.cantidad}
                             onChange={e => setMovData({ ...movData, cantidad: e.target.value })} />
-                        <input style={styles.input} placeholder="Referencia"
+                        <input className="input-base" placeholder="Referencia"
                             value={movData.referencia}
                             onChange={e => setMovData({ ...movData, referencia: e.target.value })} />
-                        <input style={styles.input} placeholder="Observación"
+                        <input className="input-base" placeholder="Observacion"
                             value={movData.observacion}
                             onChange={e => setMovData({ ...movData, observacion: e.target.value })} />
                     </div>
-                    <div style={styles.formAcciones}>
-                        <button style={styles.btnGuardar} onClick={registrarMovimiento}>Registrar</button>
-                        <button style={styles.btnCancelarForm} onClick={() => setMostrarMovimiento(false)}>Cancelar</button>
+                    <div className="form-actions">
+                        <AppButton variant="info" onClick={registrarMovimiento}>Registrar</AppButton>
+                        <AppButton variant="danger" onClick={() => setMostrarMovimiento(false)}>Cancelar</AppButton>
                     </div>
                 </div>
             )}
 
-            <div style={styles.filtros}>
+            <div className="toolbar">
                 {['todos', 'reponer'].map(f => (
-                    <button key={f} style={{
-                        ...styles.btnFiltro,
-                        backgroundColor: filtro === f ? '#1a1a2e' : '#ddd',
-                        color: filtro === f ? 'white' : '#333'
-                    }} onClick={() => setFiltro(f)}>
+                    <AppButton
+                        key={f}
+                        size="sm"
+                        variant={filtro === f ? 'primary' : 'secondary'}
+                        onClick={() => setFiltro(f)}
+                    >
                         {f === 'todos' ? 'Todos' : '⚠️ Por Reponer'}
-                    </button>
+                    </AppButton>
                 ))}
             </div>
 
-            <div style={styles.grid}>
+            <div className="cards-grid cards-grid--md">
                 {productos.map(p => (
-                    <div key={p.id} style={styles.card}>
-                        <div style={styles.cardHeader}>
-                            <h3 style={styles.nombreProducto}>{p.nombre}</h3>
-                            <span style={{
-                                ...styles.badge,
+                    <div key={p.id} className="entity-card">
+                        <div className="entity-card__header">
+                            <h3 className="entity-card__title">{p.nombre}</h3>
+                            <span className="badge" style={{
                                 backgroundColor: p.alerta === 'REPONER' ? '#e74c3c' : '#2ecc71'
                             }}>
                                 {p.alerta}
                             </span>
                         </div>
-                        <p style={styles.info}>📦 Categoría: {p.categoria || '-'}</p>
-                        <p style={styles.info}>💰 Precio: ${p.precio_unitario?.toLocaleString()}</p>
-                        <p style={styles.info}>📊 Stock mínimo: {p.stock_minimo}</p>
+                        <p className="entity-card__text">📦 Categoria: {p.categoria || '-'}</p>
+                        <p className="entity-card__text">💰 Precio: ${p.precio_unitario?.toLocaleString()}</p>
+                        <p className="entity-card__text">📊 Stock minimo: {p.stock_minimo}</p>
                         <p style={{
-                            ...styles.stockActual,
+                            fontSize: '16px',
+                            fontWeight: 'bold',
+                            margin: '8px 0',
                             color: p.alerta === 'REPONER' ? '#e74c3c' : '#2ecc71'
                         }}>
                             Stock actual: {p.stock_actual}
                         </p>
-                        <div style={styles.acciones}>
-                            <button style={styles.btnMovimiento}
+                        <div className="row-actions mt-10">
+                            <AppButton variant="info" size="sm"
                                 onClick={() => abrirMovimiento(p)}>
                                 + Movimiento
-                            </button>
-                            <button style={styles.btnEliminar}
+                            </AppButton>
+                            <AppButton variant="danger" size="sm"
                                 onClick={() => eliminar(p.id)}>
                                 Desactivar
-                            </button>
+                            </AppButton>
                         </div>
                     </div>
                 ))}
@@ -212,34 +219,5 @@ function Inventario() {
         </div>
     );
 }
-
-const styles = {
-    container: { padding: '20px', backgroundColor: '#f0f2f5', minHeight: '100vh' },
-    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-    titulo: { margin: 0, color: '#1a1a2e' },
-    loading: { textAlign: 'center', marginTop: '50px' },
-    formulario: { backgroundColor: 'white', borderRadius: '10px', padding: '20px', marginBottom: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' },
-    formTitulo: { margin: '0 0 15px 0', color: '#1a1a2e' },
-    formGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '15px' },
-    input: { padding: '10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' },
-    formAcciones: { display: 'flex', gap: '10px' },
-    btnGuardar: { padding: '10px 20px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    btnCancelarForm: { padding: '10px 20px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    filtros: { display: 'flex', gap: '10px', marginBottom: '20px' },
-    btnFiltro: { padding: '8px 15px', border: 'none', borderRadius: '20px', cursor: 'pointer', fontSize: '13px' },
-    btnVolver: { padding: '8px 15px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    btnCrear: { padding: '8px 15px', backgroundColor: '#1a1a2e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' },
-    card: { backgroundColor: 'white', borderRadius: '10px', padding: '15px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' },
-    cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' },
-    nombreProducto: { margin: 0, color: '#1a1a2e', fontSize: '15px' },
-    badge: { padding: '3px 8px', borderRadius: '20px', color: 'white', fontSize: '11px', fontWeight: 'bold' },
-    info: { margin: '4px 0', fontSize: '13px', color: '#555' },
-    stockActual: { fontSize: '16px', fontWeight: 'bold', margin: '8px 0' },
-    acciones: { display: 'flex', gap: '5px', marginTop: '10px' },
-    btnMovimiento: { flex: 1, padding: '6px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' },
-    btnEliminar: { flex: 1, padding: '6px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' },
-    label: { display: 'block', fontSize: '13px', color: '#666', marginBottom: '4px' }
-};
 
 export default Inventario;

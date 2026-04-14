@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import reservaService from '../services/reservaService';
 import consumoService from '../services/consumoService';
 import clienteService from '../services/clienteService';
 import empleadoService from '../services/empleadoService';
 
 function ModalHabitacion({ habitacion, onClose, onUpdate }) {
+    const navigate = useNavigate();
     const [pestana, setPestana] = useState('reserva');
     const [reserva, setReserva] = useState(null);
     const [habitacionReserva, setHabitacionReserva] = useState(null);
@@ -185,6 +187,59 @@ function ModalHabitacion({ habitacion, onClose, onUpdate }) {
     const anticipo = toNumber(reserva?.anticipo);
     const totalFinal = Math.max(totalReserva + totalConsumos - anticipo, 0);
 
+    const irACaja = () => {
+        if (!reserva) return;
+
+        navigate('/caja', {
+            state: {
+                origen: 'habitacion',
+                reserva: {
+                    id: reserva.id,
+                    empleado_id: reserva.empleado_id || null,
+                    estado: reserva.estado,
+                    fecha_entrada: reserva.fecha_entrada,
+                    fecha_salida: reserva.fecha_salida,
+                    num_adultos: reserva.num_adultos,
+                    num_ninos: reserva.num_ninos,
+                    fuente: reserva.fuente,
+                    observaciones: reserva.observaciones,
+                    saldo_pendiente: reserva.saldo_pendiente,
+                    total: reserva.total,
+                    anticipo: reserva.anticipo
+                },
+                habitacion: {
+                    id: habitacion.id,
+                    numero: habitacion.numero,
+                    tipo_nombre: habitacion.tipo_nombre,
+                    piso: habitacion.piso
+                },
+                cliente: {
+                    id: reserva.cliente_id || clienteDetalle?.id || null,
+                    nombre: clienteNombre,
+                    documento: clienteDocumento
+                },
+                empleado: empleadoNombre || null,
+                consumos: consumos.map((c) => ({
+                    id: c.id,
+                    tipo_nombre: c.tipo_nombre,
+                    descripcion: c.descripcion,
+                    cantidad: c.cantidad,
+                    precio_unitario: c.precio_unitario,
+                    total: c.total,
+                    fecha: c.fecha
+                })),
+                resumenPago: {
+                    precioNoche: habitacionReserva?.precio_noche || 0,
+                    totalReserva,
+                    totalConsumos,
+                    anticipo,
+                    saldoPendiente: toNumber(reserva?.saldo_pendiente),
+                    totalFinal
+                }
+            }
+        });
+    };
+
     const clienteNombre = firstNonEmpty(reserva, ['cliente_nombre', 'nombre_cliente'])
         || [clienteDetalle?.nombre, clienteDetalle?.apellido].filter(Boolean).join(' ').trim()
         || '-';
@@ -206,7 +261,14 @@ function ModalHabitacion({ habitacion, onClose, onUpdate }) {
                         <h2 style={styles.titulo}>Hab. {habitacion.numero}</h2>
                         <span style={styles.subtitulo}>{habitacion.tipo_nombre} — Piso {habitacion.piso}</span>
                     </div>
-                    <button style={styles.btnCerrar} onClick={onClose}>✕</button>
+                    <div style={styles.headerActions}>
+                        {reserva && (
+                            <button style={styles.btnCaja} onClick={irACaja}>
+                                Mandar a caja
+                            </button>
+                        )}
+                        <button style={styles.btnCerrar} onClick={onClose}>✕</button>
+                    </div>
                 </div>
 
                 {/* Pestañas */}
@@ -437,8 +499,10 @@ const styles = {
     overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
     modal: { backgroundColor: 'white', borderRadius: '12px', width: '750px', maxWidth: '95vw', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' },
     header: { backgroundColor: '#1a1a2e', padding: '20px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+    headerActions: { display: 'flex', alignItems: 'center', gap: '10px' },
     titulo: { margin: 0, color: 'white', fontSize: '20px' },
     subtitulo: { color: '#aaa', fontSize: '13px' },
+    btnCaja: { backgroundColor: '#f39c12', border: 'none', color: 'white', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' },
     btnCerrar: { backgroundColor: 'transparent', border: '1px solid #666', color: 'white', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontSize: '16px' },
     pestanas: { display: 'flex', borderBottom: '1px solid #eee', padding: '0 20px' },
     pestana: { padding: '12px 20px', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '14px', transition: 'all 0.2s' },

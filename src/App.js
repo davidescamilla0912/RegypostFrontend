@@ -11,6 +11,8 @@ import Gastos from './pages/Gastos';
 import Caja from './pages/Caja';
 import NuevoCliente from './pages/NuevoCliente';
 import EditarCliente from './pages/EditarCliente';
+import NuevoEmpleado from './pages/NuevoEmpleado';
+import EditarEmpleado from './pages/EditarEmpleado';
 
 
 
@@ -65,6 +67,14 @@ function App() {
                 <Route
                     path="/clientes/editar/:id"
                     element={token ? <EditarCliente /> : <Navigate to="/" />}
+                />
+                <Route
+                    path="/empleados/nuevo"
+                    element={token ? <NuevoEmpleado /> : <Navigate to="/" />}
+                />
+                <Route
+                    path="/empleados/editar/:id"
+                    element={token ? <EditarEmpleado /> : <Navigate to="/" />}
                 />
                 
 

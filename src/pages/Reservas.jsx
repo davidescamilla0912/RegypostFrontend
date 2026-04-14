@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import reservaService from '../services/reservaService';
 import habitacionService from '../services/habitacionService';
 import clienteService from '../services/clienteService';
+import { AppButton, PageHeader } from '../components/ui';
+import '../components/ui/ui.css';
 
 const ESTADOS_CICLO = ['pendiente', 'confirmada', 'check-in', 'check-out'];
 const ESTADOS_QUE_BLOQUEAN = new Set(['pendiente', 'confirmada', 'check-in']);
@@ -367,7 +369,7 @@ function Reservas() {
 		const actual = fromApiEstado(estadoActual);
 		const index = ESTADOS_CICLO.indexOf(actual);
 		if (index === -1) return ESTADOS_CICLO[0];
-		if (index >= ESTADOS_CICLO.length - 1) return ESTADOS_CICLO[ESTADOS_CICLO.length - 1];
+		if (actual === 'check-out') return null;
 		return ESTADOS_CICLO[index + 1];
 	};
 
@@ -376,10 +378,11 @@ function Reservas() {
 
 		const estadoActual = fromApiEstado(getValue(reserva, 'estado'));
 		const nuevoEstado = siguienteEstado(estadoActual);
-		if (nuevoEstado === estadoActual) return;
+		if (!nuevoEstado || nuevoEstado === estadoActual) return;
 
 		try {
 			await reservaService.updateEstado(reserva.id, toApiEstado(nuevoEstado));
+
 			setReservas((prev) => prev.map((r) => (
 				r.id === reserva.id
 					? { ...r, estado: nuevoEstado }
@@ -396,21 +399,9 @@ function Reservas() {
 		if (!window.confirm('¿Eliminar esta reserva?')) return;
 
 		try {
-			const detalleRes = await reservaService.getHabitaciones(id);
-			const detalle = Array.isArray(detalleRes.data)
-				? detalleRes.data
-				: Array.isArray(detalleRes.data?.data)
-					? detalleRes.data.data
-					: [];
-
-			for (const item of detalle) {
-				const habitacionId = item?.habitacion_id || item?.habitacion?.id;
-				if (!habitacionId) continue;
-				await reservaService.quitarHabitacion(id, habitacionId);
-			}
-
 			await reservaService.delete(id);
 			setReservas((prev) => prev.filter((r) => r.id !== id));
+			await cargarHabitaciones();
 		} catch (err) {
 			console.error('Error eliminando reserva', err);
 			const backendMessage = err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail;
@@ -461,70 +452,71 @@ function Reservas() {
 	};
 
 	return (
-		<div style={styles.container}>
-			<div style={styles.header}>
-				<button style={styles.btnVolver} onClick={() => navigate('/dashboard')}>← Volver</button>
-				<h2 style={styles.titulo}>Reservas</h2>
-			</div>
+		<div className="page-container">
+			<PageHeader
+				title="Reservas"
+				onBack={() => navigate('/dashboard')}
+				backLabel="← Volver"
+			/>
 
-			<form style={styles.form} onSubmit={crearReserva}>
-				<div style={styles.grid}>
-					<select style={styles.input} name="clienteId" value={form.clienteId} onChange={onChange}>
+			<form className="panel" onSubmit={crearReserva}>
+				<div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+					<select className="select-base full-width" name="clienteId" value={form.clienteId} onChange={onChange}>
 						<option value="">Cliente</option>
 						{clientes.map((c) => (
 							<option key={c.id} value={c.id}>{`${c.nombre || ''} ${c.apellido || ''}`.trim()} - {c.numero_documento || c.id}</option>
 						))}
 					</select>
-					<select style={styles.input} name="habitacionId" value={form.habitacionId} onChange={onChange}>
+					<select className="select-base full-width" name="habitacionId" value={form.habitacionId} onChange={onChange}>
 						<option value="">Habitacion (Numero)</option>
 						{habitacionesDisponibles.map((h) => (
 							<option key={h.id} value={h.id}>Hab. {h.numero}</option>
 						))}
 					</select>
-					<input style={styles.input} name="checkIn" value={form.checkIn} onChange={onChange} type="date" />
-					<input style={styles.input} name="checkOut" value={form.checkOut} onChange={onChange} type="date" />
-					<input style={styles.input} value={valoresCalculados.noches} disabled placeholder="Noches" />
-					<input style={styles.input} name="valorNoche" value={form.valorNoche} onChange={onChange} type="number" min="0" placeholder="Valor Noche" />
-					<input style={styles.input} value={valoresCalculados.valorTotal} disabled placeholder="Valor Total" />
-					<input style={styles.input} name="anticipo" value={form.anticipo} onChange={onChange} type="number" min="0" placeholder="Anticipo" />
-					<input style={styles.input} value={valoresCalculados.saldoPendiente} disabled placeholder="Saldo Pendiente" />
-					<input style={styles.input} value={etiquetaEstado(form.estado)} disabled placeholder="Estado" />
-					<input style={styles.input} name="observaciones" value={form.observaciones} onChange={onChange} placeholder="Observaciones" />
+					<input className="input-base full-width" name="checkIn" value={form.checkIn} onChange={onChange} type="date" />
+					<input className="input-base full-width" name="checkOut" value={form.checkOut} onChange={onChange} type="date" />
+					<input className="input-base full-width" value={valoresCalculados.noches} disabled placeholder="Noches" />
+					<input className="input-base full-width" name="valorNoche" value={form.valorNoche} onChange={onChange} type="number" min="0" placeholder="Valor Noche" />
+					<input className="input-base full-width" value={valoresCalculados.valorTotal} disabled placeholder="Valor Total" />
+					<input className="input-base full-width" name="anticipo" value={form.anticipo} onChange={onChange} type="number" min="0" placeholder="Anticipo" />
+					<input className="input-base full-width" value={valoresCalculados.saldoPendiente} disabled placeholder="Saldo Pendiente" />
+					<input className="input-base full-width" value={etiquetaEstado(form.estado)} disabled placeholder="Estado" />
+					<input className="input-base full-width" name="observaciones" value={form.observaciones} onChange={onChange} placeholder="Observaciones" />
 				</div>
 
-				<div style={styles.footerForm}>
-					{error ? <p style={styles.error}>{error}</p> : <span />}
-					<button style={styles.btnCrear} type="submit" disabled={guardando}>
+				<div className="form-footer">
+					{error ? <p className="error-text mb-0">{error}</p> : <span />}
+					<AppButton type="submit" disabled={guardando}>
 						{guardando ? 'Guardando...' : '+ Agregar Reserva'}
-					</button>
+					</AppButton>
 				</div>
 			</form>
 
 			{loading ? (
-				<p style={styles.loading}>Cargando reservas...</p>
+				<p className="page-loading">Cargando reservas...</p>
 			) : (
-				<div style={styles.tableContainer}>
-					<table style={styles.tabla}>
+				<div className="table-shell">
+					<table className="table-base">
 						<thead>
-							<tr style={styles.thead}>
-								<th style={styles.th}>Cliente</th>
-								<th style={styles.th}>Habitacion</th>
-								<th style={styles.th}>Check-in</th>
-								<th style={styles.th}>Check-out</th>
-								<th style={styles.th}>Noches</th>
-								<th style={styles.th}>Valor Noche</th>
-								<th style={styles.th}>Valor Total</th>
-								<th style={styles.th}>Anticipo</th>
-								<th style={styles.th}>Saldo Pendiente</th>
-								<th style={styles.th}>Estado</th>
-								<th style={styles.th}>Observaciones</th>
-								<th style={styles.th}>Acciones</th>
+							<tr>
+								<th>Cliente</th>
+								<th>Habitacion</th>
+								<th>Check-in</th>
+								<th>Check-out</th>
+								<th>Noches</th>
+								<th>Valor Noche</th>
+								<th>Valor Total</th>
+								<th>Anticipo</th>
+								<th>Saldo Pendiente</th>
+								<th>Estado</th>
+								<th>Observaciones</th>
+								<th>Acciones</th>
 							</tr>
 						</thead>
 						<tbody>
 							{reservas.length === 0 ? (
 								<tr>
-									<td colSpan={12} style={styles.emptyCell}>No hay reservas registradas.</td>
+									<td colSpan={12} className="table-empty">No hay reservas registradas.</td>
 								</tr>
 							) : (
 								reservas.map((r, index) => {
@@ -537,34 +529,36 @@ function Reservas() {
 									const fechaSalida = getValue(r, 'fecha_salida', 'check_out', 'checkOut');
 
 									return (
-										<tr key={r.id || `${r.habitacion_id || r.habitacion || 'reserva'}-${index}`} style={styles.tr}>
-											<td style={styles.td}>{getClienteNombre(r)}</td>
-											<td style={styles.td}>{getHabitacionNumero(r)}</td>
-											<td style={styles.td}>{fechaEntrada}</td>
-											<td style={styles.td}>{fechaSalida}</td>
-											<td style={styles.td}>{noches || '-'}</td>
-											<td style={styles.td}>$ {toCurrency(valorNoche)}</td>
-											<td style={styles.td}>$ {toCurrency(valorTotal)}</td>
-											<td style={styles.td}>$ {toCurrency(anticipo)}</td>
-											<td style={styles.td}>$ {toCurrency(saldo)}</td>
-											<td style={styles.td}>
-												<button
-													style={{ ...styles.btnEstado, backgroundColor: colorEstado(getValue(r, 'estado')) }}
+										<tr key={r.id || `${r.habitacion_id || r.habitacion || 'reserva'}-${index}`}>
+											<td>{getClienteNombre(r)}</td>
+											<td>{getHabitacionNumero(r)}</td>
+											<td>{fechaEntrada}</td>
+											<td>{fechaSalida}</td>
+											<td>{noches || '-'}</td>
+											<td>$ {toCurrency(valorNoche)}</td>
+											<td>$ {toCurrency(valorTotal)}</td>
+											<td>$ {toCurrency(anticipo)}</td>
+											<td>$ {toCurrency(saldo)}</td>
+											<td>
+												<AppButton
+													size="sm"
+													style={{ backgroundColor: colorEstado(getValue(r, 'estado')) }}
 													onClick={() => cambiarEstadoReserva(r)}
-													disabled={!r.id}
+													disabled={!r.id || fromApiEstado(getValue(r, 'estado')) === 'check-out'}
 												>
 													{etiquetaEstado(getValue(r, 'estado'))}
-												</button>
+												</AppButton>
 											</td>
-											<td style={styles.td}>{getValue(r, 'observaciones')}</td>
-											<td style={styles.td}>
-												<button
-													style={styles.btnEliminar}
+											<td>{getValue(r, 'observaciones')}</td>
+											<td>
+												<AppButton
+													variant="danger"
+													size="sm"
 													onClick={() => eliminarReserva(r.id)}
 													disabled={!r.id}
 												>
 													Eliminar
-												</button>
+												</AppButton>
 											</td>
 										</tr>
 									);
@@ -577,68 +571,5 @@ function Reservas() {
 		</div>
 	);
 }
-
-const styles = {
-	container: { padding: '20px', backgroundColor: '#f0f2f5', minHeight: '100vh' },
-	header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-	titulo: { margin: 0, color: '#1a1a2e' },
-	form: {
-		backgroundColor: 'white',
-		borderRadius: '10px',
-		boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-		padding: '15px',
-		marginBottom: '20px'
-	},
-	grid: {
-		display: 'grid',
-		gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-		gap: '10px'
-	},
-	input: {
-		padding: '10px',
-		borderRadius: '6px',
-		border: '1px solid #ddd',
-		fontSize: '14px'
-	},
-	footerForm: {
-		marginTop: '12px',
-		display: 'flex',
-		justifyContent: 'space-between',
-		alignItems: 'center'
-	},
-	error: {
-		color: '#c0392b',
-		margin: 0,
-		fontSize: '13px'
-	},
-	btnVolver: { padding: '8px 15px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-	btnCrear: { padding: '10px 15px', backgroundColor: '#1a1a2e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-	loading: { textAlign: 'center', marginTop: '40px' },
-	tableContainer: { backgroundColor: 'white', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', overflow: 'auto' },
-	tabla: { width: '100%', borderCollapse: 'collapse' },
-	thead: { backgroundColor: '#1a1a2e' },
-	th: { padding: '12px 10px', color: 'white', textAlign: 'left', fontSize: '13px', whiteSpace: 'nowrap' },
-	tr: { borderBottom: '1px solid #eee' },
-	td: { padding: '12px 10px', fontSize: '13px', color: '#333', whiteSpace: 'nowrap' },
-	emptyCell: { textAlign: 'center', padding: '20px', color: '#777' },
-	btnEstado: {
-		padding: '6px 10px',
-		color: 'white',
-		border: 'none',
-		borderRadius: '5px',
-		cursor: 'pointer',
-		fontSize: '12px',
-		fontWeight: 'bold'
-	},
-	btnEliminar: {
-		padding: '6px 10px',
-		backgroundColor: '#e74c3c',
-		color: 'white',
-		border: 'none',
-		borderRadius: '5px',
-		cursor: 'pointer',
-		fontSize: '12px'
-	}
-};
 
 export default Reservas;

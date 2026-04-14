@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import gastoService from '../services/gastoService';
+import { AppButton, DataTable, PageHeader } from '../components/ui';
+import '../components/ui/ui.css';
 
 function Gastos() {
     const [gastos, setGastos] = useState([]);
@@ -92,155 +94,124 @@ function Gastos() {
     };
 
     const totalGastos = gastos.reduce((sum, g) => sum + parseFloat(g.monto || 0), 0);
+    const columns = [
+        { key: 'id', label: 'ID' },
+        { key: 'fecha', label: 'Fecha' },
+        { key: 'categoria', label: 'Categoria' },
+        { key: 'descripcion', label: 'Descripcion' },
+        { key: 'monto', label: 'Monto' },
+        { key: 'empleado', label: 'Empleado' },
+        { key: 'acciones', label: 'Acciones' }
+    ];
 
-    if (loading) return <p style={styles.loading}>Cargando gastos...</p>;
+    if (loading) return <p className="page-loading">Cargando gastos...</p>;
 
     return (
-        <div style={styles.container}>
-            <div style={styles.header}>
-                <button style={styles.btnVolver} onClick={() => navigate('/dashboard')}>← Volver</button>
-                <h2 style={styles.titulo}>Gastos</h2>
-                <button style={styles.btnCrear} onClick={() => {
-                    setEditando(null);
-                    setFormData({ fecha: '', categoria: 'varios', descripcion: '', monto: '', empleado_id: '' });
-                    setMostrarFormulario(!mostrarFormulario);
-                }}>
-                    + Nuevo Gasto
-                </button>
-            </div>
+        <div className="page-container">
+            <PageHeader
+                title="Gastos"
+                onBack={() => navigate('/dashboard')}
+                backLabel="← Volver"
+                actions={(
+                    <AppButton onClick={() => {
+                        setEditando(null);
+                        setFormData({ fecha: '', categoria: 'varios', descripcion: '', monto: '', empleado_id: '' });
+                        setMostrarFormulario(!mostrarFormulario);
+                    }}>
+                        + Nuevo Gasto
+                    </AppButton>
+                )}
+            />
 
-            <div style={styles.resumen}>
-                <div style={styles.cardResumen}>
-                    <p style={styles.resumenLabel}>Total Gastos</p>
-                    <p style={styles.resumenValor}>${totalGastos.toLocaleString()}</p>
+            <div className="summary-row">
+                <div className="summary-card">
+                    <p className="summary-card__label">Total Gastos</p>
+                    <p className="summary-card__value">${totalGastos.toLocaleString()}</p>
                 </div>
-                <div style={styles.cardResumen}>
-                    <p style={styles.resumenLabel}>Cantidad</p>
-                    <p style={styles.resumenValor}>{gastos.length}</p>
+                <div className="summary-card">
+                    <p className="summary-card__label">Cantidad</p>
+                    <p className="summary-card__value">{gastos.length}</p>
                 </div>
             </div>
 
             {mostrarFormulario && (
-                <div style={styles.formulario}>
-                    <h3 style={styles.formTitulo}>{editando ? 'Editar Gasto' : 'Nuevo Gasto'}</h3>
-                    <div style={styles.formGrid}>
-                        <input style={styles.input} type="date"
+                <div className="panel">
+                    <h3 className="panel-title">{editando ? 'Editar Gasto' : 'Nuevo Gasto'}</h3>
+                    <div className="form-grid form-grid--3">
+                        <input className="input-base" type="date"
                             value={formData.fecha}
                             onChange={e => setFormData({ ...formData, fecha: e.target.value })} />
-                        <select style={styles.input}
+                        <select className="select-base"
                             value={formData.categoria}
                             onChange={e => setFormData({ ...formData, categoria: e.target.value })}>
                             {categorias.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
-                        <input style={styles.input} placeholder="Descripción"
+                        <input className="input-base" placeholder="Descripcion"
                             value={formData.descripcion}
                             onChange={e => setFormData({ ...formData, descripcion: e.target.value })} />
-                        <input style={styles.input} placeholder="Monto *" type="number"
+                        <input className="input-base" placeholder="Monto *" type="number"
                             value={formData.monto}
                             onChange={e => setFormData({ ...formData, monto: e.target.value })} />
-                        <input style={styles.input} placeholder="Empleado ID (opcional)" type="number"
+                        <input className="input-base" placeholder="Empleado ID (opcional)" type="number"
                             value={formData.empleado_id}
                             onChange={e => setFormData({ ...formData, empleado_id: e.target.value })} />
                     </div>
-                    <div style={styles.formAcciones}>
-                        <button style={styles.btnGuardar} onClick={guardar}>
+                    <div className="form-actions">
+                        <AppButton variant="info" onClick={guardar}>
                             {editando ? 'Actualizar' : 'Guardar'}
-                        </button>
-                        <button style={styles.btnCancelarForm} onClick={() => setMostrarFormulario(false)}>Cancelar</button>
+                        </AppButton>
+                        <AppButton variant="danger" onClick={() => setMostrarFormulario(false)}>Cancelar</AppButton>
                     </div>
                 </div>
             )}
 
-            <div style={styles.filtros}>
-                <input style={styles.inputFecha} type="date"
+            <div className="toolbar">
+                <input className="input-base" type="date"
                     value={filtroFecha}
                     onChange={e => setFiltroFecha(e.target.value)} />
-                <button style={styles.btnBuscar} onClick={filtrarPorFecha}>Filtrar fecha</button>
-                <select style={styles.selectFiltro}
+                <AppButton onClick={filtrarPorFecha}>Filtrar fecha</AppButton>
+                <select className="select-base"
                     value={filtroCategoria}
                     onChange={e => filtrarPorCategoria(e.target.value)}>
-                    <option value="">Todas las categorías</option>
+                    <option value="">Todas las categorias</option>
                     {categorias.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
-                <button style={styles.btnLimpiar} onClick={() => {
+                <AppButton variant="secondary" onClick={() => {
+                    setEditando(null);
+                    setFormData({ fecha: '', categoria: 'varios', descripcion: '', monto: '', empleado_id: '' });
                     setFiltroFecha('');
                     setFiltroCategoria('');
                     cargarGastos();
-                }}>Limpiar</button>
+                }}>
+                    Limpiar
+                </AppButton>
             </div>
 
-            <div style={styles.tableContainer}>
-                <table style={styles.tabla}>
-                    <thead>
-                        <tr style={styles.thead}>
-                            <th style={styles.th}>ID</th>
-                            <th style={styles.th}>Fecha</th>
-                            <th style={styles.th}>Categoría</th>
-                            <th style={styles.th}>Descripción</th>
-                            <th style={styles.th}>Monto</th>
-                            <th style={styles.th}>Empleado</th>
-                            <th style={styles.th}>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {gastos.map(g => (
-                            <tr key={g.id} style={styles.tr}>
-                                <td style={styles.td}>#{g.id}</td>
-                                <td style={styles.td}>{g.fecha}</td>
-                                <td style={styles.td}>
-                                    <span style={styles.badge}>{g.categoria}</span>
-                                </td>
-                                <td style={styles.td}>{g.descripcion || '-'}</td>
-                                <td style={styles.td}><strong>${parseFloat(g.monto).toLocaleString()}</strong></td>
-                                <td style={styles.td}>{g.empleado_nombre || '-'}</td>
-                                <td style={styles.td}>
-                                    <div style={styles.acciones}>
-                                        <button style={styles.btnEditar} onClick={() => editar(g)}>Editar</button>
-                                        <button style={styles.btnEliminar} onClick={() => eliminar(g.id)}>Eliminar</button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+            <DataTable
+                columns={columns}
+                data={gastos}
+                rowKey="id"
+                renderCell={(g, column) => {
+                    if (column.key === 'id') return `#${g.id}`;
+                    if (column.key === 'fecha') return g.fecha;
+                    if (column.key === 'categoria') return <span className="badge" style={{ backgroundColor: '#3498db' }}>{g.categoria}</span>;
+                    if (column.key === 'descripcion') return g.descripcion || '-';
+                    if (column.key === 'monto') return <strong>${parseFloat(g.monto).toLocaleString()}</strong>;
+                    if (column.key === 'empleado') return g.empleado_nombre || '-';
+                    if (column.key === 'acciones') {
+                        return (
+                            <div className="row-actions">
+                                <AppButton variant="info" size="sm" onClick={() => editar(g)}>Editar</AppButton>
+                                <AppButton variant="danger" size="sm" onClick={() => eliminar(g.id)}>Eliminar</AppButton>
+                            </div>
+                        );
+                    }
+                    return '-';
+                }}
+                emptyMessage="No hay gastos registrados."
+            />
         </div>
     );
 }
-
-const styles = {
-    container: { padding: '20px', backgroundColor: '#f0f2f5', minHeight: '100vh' },
-    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-    titulo: { margin: 0, color: '#1a1a2e' },
-    loading: { textAlign: 'center', marginTop: '50px' },
-    resumen: { display: 'flex', gap: '15px', marginBottom: '20px' },
-    cardResumen: { backgroundColor: 'white', borderRadius: '10px', padding: '15px 25px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', textAlign: 'center' },
-    resumenLabel: { margin: 0, fontSize: '13px', color: '#666' },
-    resumenValor: { margin: '5px 0 0 0', fontSize: '22px', fontWeight: 'bold', color: '#1a1a2e' },
-    formulario: { backgroundColor: 'white', borderRadius: '10px', padding: '20px', marginBottom: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' },
-    formTitulo: { margin: '0 0 15px 0', color: '#1a1a2e' },
-    formGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '15px' },
-    input: { padding: '10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' },
-    formAcciones: { display: 'flex', gap: '10px' },
-    btnGuardar: { padding: '10px 20px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    btnCancelarForm: { padding: '10px 20px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    filtros: { display: 'flex', gap: '10px', marginBottom: '20px', alignItems: 'center' },
-    inputFecha: { padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' },
-    selectFiltro: { padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' },
-    btnBuscar: { padding: '8px 15px', backgroundColor: '#1a1a2e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    btnLimpiar: { padding: '8px 15px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    btnVolver: { padding: '8px 15px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    btnCrear: { padding: '8px 15px', backgroundColor: '#1a1a2e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    tableContainer: { backgroundColor: 'white', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', overflow: 'auto' },
-    tabla: { width: '100%', borderCollapse: 'collapse' },
-    thead: { backgroundColor: '#1a1a2e' },
-    th: { padding: '12px 15px', color: 'white', textAlign: 'left', fontSize: '14px' },
-    tr: { borderBottom: '1px solid #eee' },
-    td: { padding: '12px 15px', fontSize: '14px', color: '#333' },
-    badge: { padding: '4px 10px', borderRadius: '20px', backgroundColor: '#3498db', color: 'white', fontSize: '12px' },
-    acciones: { display: 'flex', gap: '5px' },
-    btnEditar: { padding: '5px 10px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' },
-    btnEliminar: { padding: '5px 10px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }
-};
 
 export default Gastos;
