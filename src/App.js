@@ -13,6 +13,7 @@ import NuevoCliente from './pages/NuevoCliente';
 import EditarCliente from './pages/EditarCliente';
 import NuevoEmpleado from './pages/NuevoEmpleado';
 import EditarEmpleado from './pages/EditarEmpleado';
+import NuevoHabitacion from './pages/NuevoHabitacion';
 
 
 
@@ -39,6 +40,10 @@ function App() {
                 <Route
                     path="/habitaciones"
                     element={token ? <Habitaciones /> : <Navigate to="/" />}
+                />
+                <Route
+                    path="/habitaciones/nueva"
+                    element={token ? <NuevoHabitacion /> : <Navigate to="/" />}
                 />
                 <Route
                     path="/empleados"

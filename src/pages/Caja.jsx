@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import cajaService from '../services/cajaService';
 import pagoService from '../services/pagoService';
+import empleadoService from '../services/empleadoService';
 import { AppButton, DataTable, PageHeader } from '../components/ui';
 import '../components/ui/ui.css';
 
 function Caja() {
     const [cuadres, setCuadres] = useState([]);
+    const [empleados, setEmpleados] = useState([]);
     const [pagosOriginales, setPagosOriginales] = useState([]);
     const [pagos, setPagos] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -140,13 +142,35 @@ function Caja() {
         }
     };
 
+    const cargarEmpleados = async () => {
+        try {
+            const res = await empleadoService.getAll();
+            setEmpleados(normalizarLista(res));
+        } catch (err) {
+            console.error('Error cargando empleados', err);
+            setEmpleados([]);
+        }
+    };
+
     const cargarDatos = async () => {
         try {
             setLoading(true);
-            await Promise.all([cargarCuadres(), cargarPagos()]);
+            await Promise.all([cargarCuadres(), cargarPagos(), cargarEmpleados()]);
         } finally {
             setLoading(false);
         }
+    };
+
+    const getEmpleadoNombre = (pago) => {
+        const empleadoId = pago?.empleado_id;
+
+        if (!empleadoId) return '-';
+
+        const empleado = empleados.find((e) => String(e.id) === String(empleadoId));
+        if (!empleado) return `ID ${empleadoId}`;
+
+        const nombreCompleto = `${empleado.nombre || ''} ${empleado.apellido || ''}`.trim();
+        return nombreCompleto || empleado.usuario || empleado.username || `ID ${empleadoId}`;
     };
 
     const filtrarPorFecha = async () => {
@@ -297,7 +321,7 @@ function Caja() {
     const paymentColumns = [
         { key: 'id', label: 'ID' },
         { key: 'reserva_id', label: 'Reserva ID' },
-        { key: 'empleado_id', label: 'Empleado ID' },
+        { key: 'empleado', label: 'Empleado' },
         { key: 'metodo', label: 'Método' },
         { key: 'monto', label: 'Monto' },
         { key: 'referencia', label: 'Referencia' },
@@ -545,7 +569,7 @@ function Caja() {
                     renderCell={(pago, column) => {
                         if (column.key === 'id') return `#${pago.id}`;
                         if (column.key === 'reserva_id') return pago.reserva_id ?? '-';
-                        if (column.key === 'empleado_id') return pago.empleado_id ?? '-';
+                        if (column.key === 'empleado') return getEmpleadoNombre(pago);
                         if (column.key === 'metodo') return pago.metodo || '-';
                         if (column.key === 'monto') return `$${parseFloat(pago.monto || 0).toLocaleString()}`;
                         if (column.key === 'referencia') return pago.referencia || '-';

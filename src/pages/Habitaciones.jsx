@@ -53,7 +53,7 @@ function Habitaciones() {
             disponible: '#2ecc71',
             ocupada: '#e74c3c',
             mantenimiento: '#f39c12',
-            inactiva: '#95a5a6'
+            bloqueada: '#95a5a6'
         };
         return colores[estado] || '#95a5a6';
     };
@@ -72,7 +72,7 @@ function Habitaciones() {
             />
 
             <div className="toolbar">
-                {['todos', 'disponible', 'ocupada', 'mantenimiento', 'inactiva'].map(estado => (
+                {['todos', 'disponible', 'ocupada', 'mantenimiento', 'bloqueada'].map(estado => (
                     <AppButton
                         key={estado}
                         size="sm"
@@ -107,7 +107,7 @@ function Habitaciones() {
                                 <option value="disponible">Disponible</option>
                                 <option value="ocupada">Ocupada</option>
                                 <option value="mantenimiento">Mantenimiento</option>
-                                <option value="inactiva">Inactiva</option>
+                                <option value="bloqueada">Bloqueada</option>
                             </select>
                         </div>
 

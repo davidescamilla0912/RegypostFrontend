@@ -34,6 +34,8 @@ const initialForm = {
 	noches: 0,
 	valorNoche: '',
 	valorTotal: 0,
+	numAdultos: 1,
+	numNinos: 0,
 	anticipo: '',
 	saldoPendiente: 0,
 	estado: 'pendiente',
@@ -99,6 +101,7 @@ function Reservas() {
 	const [loading, setLoading] = useState(true);
 	const [guardando, setGuardando] = useState(false);
 	const [form, setForm] = useState(initialForm);
+	const [busqueda, setBusqueda] = useState('');
 	const [error, setError] = useState('');
 
 	useEffect(() => {
@@ -296,6 +299,8 @@ function Reservas() {
 		const valorNoche = Number(form.valorNoche) || 0;
 		const anticipo = Number(form.anticipo) || 0;
 		const hoy = new Date().toISOString().slice(0, 10);
+		const numAdultos = Number(form.numAdultos) || 0;
+		const numNinos = Number(form.numNinos) || 0;
 
 		const payload = {
 			cliente_id: clienteId,
@@ -306,8 +311,8 @@ function Reservas() {
 			fecha_salida: form.checkOut,
 			check_in: form.checkIn,
 			check_out: form.checkOut,
-			num_adultos: 1,
-			num_ninos: 0,
+			num_adultos: numAdultos,
+			num_ninos: numNinos,
 			fuente: 'directa',
 			noches: valoresCalculados.noches,
 			precio_noche: valorNoche,
@@ -415,12 +420,39 @@ function Reservas() {
 		return reserva[firstKey];
 	};
 
+	const normalizarTexto = (texto) => String(texto || '')
+		.toLowerCase()
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.trim();
+
 	const getClienteNombre = (reserva) => {
 		const clienteId = getValue(reserva, 'cliente_id');
 		const cliente = clientes.find((c) => String(c.id) === String(clienteId));
 		if (!cliente) return clienteId !== '-' ? `ID ${clienteId}` : '-';
 		return `${cliente.nombre || ''} ${cliente.apellido || ''}`.trim() || `ID ${cliente.id}`;
 	};
+
+	const getClienteDocumento = (reserva) => {
+		const clienteId = getValue(reserva, 'cliente_id');
+		const cliente = clientes.find((c) => String(c.id) === String(clienteId));
+		return cliente?.numero_documento
+			|| getValue(reserva, 'cliente_documento', 'documento_cliente', 'numero_documento', 'documento')
+			|| clienteId;
+	};
+
+	const reservasFiltradas = useMemo(() => {
+		const consulta = normalizarTexto(busqueda);
+		if (!consulta) return reservas;
+
+		return reservas.filter((reserva) => {
+			const nombre = normalizarTexto(getClienteNombre(reserva));
+			const documento = normalizarTexto(getClienteDocumento(reserva));
+			const clienteId = normalizarTexto(getValue(reserva, 'cliente_id'));
+
+			return nombre.includes(consulta) || documento.includes(consulta) || clienteId.includes(consulta);
+		});
+	}, [busqueda, reservas, clientes]);
 
 	const getHabitacionNumero = (reserva) => {
 		const detalle = reserva.reserva_habitaciones?.[0] || reserva.habitaciones?.[0] || null;
@@ -477,6 +509,15 @@ function Reservas() {
 					<input className="input-base full-width" name="checkOut" value={form.checkOut} onChange={onChange} type="date" />
 					<input className="input-base full-width" value={valoresCalculados.noches} disabled placeholder="Noches" />
 					<input className="input-base full-width" name="valorNoche" value={form.valorNoche} onChange={onChange} type="number" min="0" placeholder="Valor Noche" />
+				    <div>
+						<label className="label" style={{ color: '#000000', fontWeight: 400 }}>ADULTOS</label>
+						<input className="input-base full-width" name="numAdultos" value={form.numAdultos} onChange={onChange} type="number" min="1" placeholder="Ej: 1" style={{ color: '#6b7280', fontWeight: 700 }} />
+				    </div>
+					<div>
+						<label className="label" style={{ color: '#000000', fontWeight: 400 }}>NIÑOS</label>
+						<input className="input-base full-width" name="numNinos" value={form.numNinos} onChange={onChange} type="number" min="0" placeholder="Ej: 0" style={{ color: '#6b7280', fontWeight: 700 }} />
+					</div>
+
 					<input className="input-base full-width" value={valoresCalculados.valorTotal} disabled placeholder="Valor Total" />
 					<input className="input-base full-width" name="anticipo" value={form.anticipo} onChange={onChange} type="number" min="0" placeholder="Anticipo" />
 					<input className="input-base full-width" value={valoresCalculados.saldoPendiente} disabled placeholder="Saldo Pendiente" />
@@ -495,7 +536,19 @@ function Reservas() {
 			{loading ? (
 				<p className="page-loading">Cargando reservas...</p>
 			) : (
-				<div className="table-shell">
+				<div>
+					<div className="toolbar" style={{ marginBottom: 12 }}>
+						<input
+							className="input-base"
+							type="text"
+							placeholder="Buscar por nombre o CC"
+							value={busqueda}
+							onChange={(e) => setBusqueda(e.target.value)}
+							onKeyDown={(e) => e.key === 'Enter' && setBusqueda((prev) => prev.trim())}
+						/>
+						<AppButton type="button" onClick={() => setBusqueda((prev) => prev.trim())}>Buscar</AppButton>
+					</div>
+					<div className="table-shell">
 					<table className="table-base">
 						<thead>
 							<tr>
@@ -504,6 +557,8 @@ function Reservas() {
 								<th>Check-in</th>
 								<th>Check-out</th>
 								<th>Noches</th>
+								<th>Adultos</th>
+								<th>Niños</th>
 								<th>Valor Noche</th>
 								<th>Valor Total</th>
 								<th>Anticipo</th>
@@ -514,12 +569,16 @@ function Reservas() {
 							</tr>
 						</thead>
 						<tbody>
-							{reservas.length === 0 ? (
+							{reservasFiltradas.length === 0 ? (
 								<tr>
-									<td colSpan={12} className="table-empty">No hay reservas registradas.</td>
+									<td colSpan={14} className="table-empty">
+										{busqueda.trim()
+											? 'No se encontraron reservas para esa búsqueda.'
+											: 'No hay reservas registradas.'}
+									</td>
 								</tr>
 							) : (
-								reservas.map((r, index) => {
+								reservasFiltradas.map((r, index) => {
 									const noches = getNoches(r);
 									const valorNoche = getPrecioNoche(r);
 									const valorTotal = Number(getValue(r, 'total', 'valor_total', 'valorTotal')) || (noches * valorNoche);
@@ -535,6 +594,8 @@ function Reservas() {
 											<td>{fechaEntrada}</td>
 											<td>{fechaSalida}</td>
 											<td>{noches || '-'}</td>
+											<td>{Number(getValue(r, 'num_adultos', 'numAdultos')) || 0}</td>
+											<td>{Number(getValue(r, 'num_ninos', 'numNinos')) || 0}</td>
 											<td>$ {toCurrency(valorNoche)}</td>
 											<td>$ {toCurrency(valorTotal)}</td>
 											<td>$ {toCurrency(anticipo)}</td>
@@ -566,6 +627,7 @@ function Reservas() {
 							)}
 						</tbody>
 					</table>
+					</div>
 				</div>
 			)}
 		</div>
