@@ -17,8 +17,12 @@ function Caja() {
     const [filtroFecha, setFiltroFecha] = useState('');
     const [mostrarResumenCobro, setMostrarResumenCobro] = useState(false);
     const [guardandoPago, setGuardandoPago] = useState(false);
+    const [editandoPago, setEditandoPago] = useState(null);
+    const [guardandoEdicionPago, setGuardandoEdicionPago] = useState(false);
     const [mensajePago, setMensajePago] = useState('');
+    const [mensajeEdicionPago, setMensajeEdicionPago] = useState('');
     const [errorPago, setErrorPago] = useState('');
+    const [errorEdicionPago, setErrorEdicionPago] = useState('');
     const [formPago, setFormPago] = useState({
         fecha_pago: new Date().toISOString().slice(0, 10),
         metodo: 'efectivo',
@@ -57,6 +61,23 @@ function Caja() {
             hour: '2-digit',
             minute: '2-digit'
         }).format(fecha);
+    };
+
+    const formatFechaInput = (value) => {
+        if (!value) return new Date().toISOString().slice(0, 10);
+
+        if (typeof value === 'string') {
+            const match = value.match(/^(\d{4}-\d{2}-\d{2})/);
+            if (match?.[1]) return match[1];
+        }
+
+        const fecha = new Date(value);
+        if (Number.isNaN(fecha.getTime())) return new Date().toISOString().slice(0, 10);
+
+        const year = fecha.getUTCFullYear();
+        const month = String(fecha.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(fecha.getUTCDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     };
 
     const fechaClave = (value) => {
@@ -194,13 +215,65 @@ function Caja() {
 
     const calcularTotal = (data) => {
         return (
-            parseFloat(data.efectivo || 0) +
             parseFloat(data.tarjetas || 0) +
             parseFloat(data.consignacion || 0) +
             parseFloat(data.factura_cxc || 0) +
             parseFloat(data.factura_credito || 0) -
             parseFloat(data.gastos_turno || 0)
         );
+    };
+
+    const abrirEdicionPago = (pago) => {
+        setEditandoPago(pago);
+        setMensajeEdicionPago('');
+        setErrorEdicionPago('');
+        setFormPago({
+            fecha_pago: formatFechaInput(pago?.fecha_pago || pago?.fecha),
+            metodo: pago?.metodo || 'efectivo',
+            referencia: pago?.referencia || '',
+            notas: pago?.notas || ''
+        });
+    };
+
+    const cancelarEdicionPago = () => {
+        setEditandoPago(null);
+        setMensajeEdicionPago('');
+        setErrorEdicionPago('');
+        setFormPago({
+            fecha_pago: new Date().toISOString().slice(0, 10),
+            metodo: 'efectivo',
+            referencia: '',
+            notas: ''
+        });
+    };
+
+    const guardarEdicionPago = async () => {
+        if (!editandoPago?.id) return;
+
+        try {
+            setGuardandoEdicionPago(true);
+            setMensajeEdicionPago('');
+            setErrorEdicionPago('');
+
+            await pagoService.update(editandoPago.id, {
+                reserva_id: editandoPago.reserva_id || null,
+                empleado_id: editandoPago.empleado_id || null,
+                monto: editandoPago.monto,
+                metodo: formPago.metodo,
+                referencia: formPago.referencia?.trim() || '',
+                fecha_pago: formPago.fecha_pago || new Date().toISOString().slice(0, 10),
+                notas: formPago.notas?.trim() || ''
+            });
+
+            setMensajeEdicionPago('Pago actualizado correctamente.');
+            await cargarPagos();
+        } catch (err) {
+            console.error('Error actualizando pago', err);
+            const backendMessage = err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail;
+            setErrorEdicionPago(backendMessage || 'No se pudo actualizar el pago.');
+        } finally {
+            setGuardandoEdicionPago(false);
+        }
     };
 
     const pagoResumen = pagoDesdeHabitacion?.resumenPago || null;
@@ -326,7 +399,8 @@ function Caja() {
         { key: 'monto', label: 'Monto' },
         { key: 'referencia', label: 'Referencia' },
         { key: 'fecha_pago', label: 'Fecha pago' },
-        { key: 'notas', label: 'Notas' }
+        { key: 'notas', label: 'Notas' },
+        { key: 'acciones', label: 'Acciones' }
     ];
 
     if (loading) return <p className="page-loading">Cargando cuadres...</p>;
@@ -434,9 +508,16 @@ function Caja() {
                                     onChange={(e) => setFormPago((prev) => ({ ...prev, metodo: e.target.value }))}
                                 >
                                     <option value="efectivo">Efectivo</option>
-                                    <option value="tarjeta">Tarjeta</option>
+                                    <option value="tarjeta_debito">Tarjeta débito</option>
+                                    <option value="tarjeta_credito">Tarjeta crédito</option>
                                     <option value="transferencia">Transferencia</option>
-                                    <option value="mixto">Mixto</option>
+                                    <option value="nequi">Nequi</option>
+                                    <option value="daviplata">Daviplata</option>
+                                    <option value="consignacion">Consignación</option>
+                                    <option value="cxc">CXC</option>
+                                    <option value="credito">Crédito</option>
+                                    <option value="canje">Canje</option>
+                                    <option value="otro">Otro</option>
                                 </select>
                             </div>
                             <div>
@@ -560,6 +641,85 @@ function Caja() {
                 }}>Limpiar</AppButton>
             </div>
 
+            {editandoPago && (
+                <div className="panel" style={{ marginTop: '20px', border: '1px solid #3498db' }}>
+                    <h3 className="panel-title">Editar pago #{editandoPago.id}</h3>
+                    <div className="form-grid form-grid--3">
+                        <div>
+                            <label className="label">Fecha de pago</label>
+                            <input
+                                className="input-base full-width"
+                                type="date"
+                                value={formPago.fecha_pago}
+                                onChange={(e) => setFormPago((prev) => ({ ...prev, fecha_pago: e.target.value }))}
+                            />
+                        </div>
+                        <div>
+                            <label className="label">Método</label>
+                            <select
+                                className="select-base full-width"
+                                value={formPago.metodo}
+                                onChange={(e) => setFormPago((prev) => ({ ...prev, metodo: e.target.value }))}
+                            >
+                                <option value="efectivo">Efectivo</option>
+                                <option value="tarjeta_debito">Tarjeta débito</option>
+                                <option value="tarjeta_credito">Tarjeta crédito</option>
+                                <option value="transferencia">Transferencia</option>
+                                <option value="nequi">Nequi</option>
+                                <option value="daviplata">Daviplata</option>
+                                <option value="consignacion">Consignación</option>
+                                <option value="cxc">CXC</option>
+                                <option value="credito">Crédito</option>
+                                <option value="canje">Canje</option>
+                                <option value="otro">Otro</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="label">Referencia</label>
+                            <input
+                                className="input-base full-width"
+                                placeholder="Referencia"
+                                value={formPago.referencia}
+                                onChange={(e) => setFormPago((prev) => ({ ...prev, referencia: e.target.value }))}
+                            />
+                        </div>
+                        <div>
+                            <label className="label">Monto</label>
+                            <input className="input-base full-width" type="text" value={formatMoney(editandoPago.monto)} disabled />
+                        </div>
+                        <div>
+                            <label className="label">Reserva ID</label>
+                            <input className="input-base full-width" type="text" value={editandoPago.reserva_id ?? '-'} disabled />
+                        </div>
+                        <div>
+                            <label className="label">Empleado</label>
+                            <input className="input-base full-width" type="text" value={getEmpleadoNombre(editandoPago)} disabled />
+                        </div>
+                        <div className="full-width" style={{ gridColumn: '1 / -1' }}>
+                            <label className="label">Notas</label>
+                            <textarea
+                                className="input-base full-width"
+                                rows={3}
+                                value={formPago.notas}
+                                onChange={(e) => setFormPago((prev) => ({ ...prev, notas: e.target.value }))}
+                            />
+                        </div>
+                    </div>
+
+                    {mensajeEdicionPago && <p style={{ marginTop: '12px', color: '#27ae60', fontWeight: '600' }}>{mensajeEdicionPago}</p>}
+                    {errorEdicionPago && <p className="error-text" style={{ marginTop: '12px' }}>{errorEdicionPago}</p>}
+
+                    <div className="form-actions">
+                        <AppButton variant="info" onClick={guardarEdicionPago} disabled={guardandoEdicionPago}>
+                            {guardandoEdicionPago ? 'Actualizando...' : 'Actualizar pago'}
+                        </AppButton>
+                        <AppButton variant="secondary" onClick={cancelarEdicionPago}>
+                            cerrar
+                        </AppButton>
+                    </div>
+                </div>
+            )}
+
             <div className="panel" style={{ marginTop: '20px' }}>
                 <h3 className="panel-title">Historial de pagos de reservas</h3>
                 <DataTable
@@ -575,6 +735,15 @@ function Caja() {
                         if (column.key === 'referencia') return pago.referencia || '-';
                         if (column.key === 'fecha_pago') return formatFechaPago(pago.fecha_pago || pago.fecha);
                         if (column.key === 'notas') return pago.notas || '-';
+                        if (column.key === 'acciones') {
+                            return (
+                                <div className="row-actions">
+                                    <AppButton variant="info" size="sm" onClick={() => abrirEdicionPago(pago)}>
+                                        Editar
+                                    </AppButton>
+                                </div>
+                            );
+                        }
                         return '-';
                     }}
                     emptyMessage="No hay pagos registrados todavía."

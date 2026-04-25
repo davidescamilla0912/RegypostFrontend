@@ -1,8 +1,20 @@
 import { useNavigate } from 'react-router-dom';
+import '../components/ui/Dashboard.css';
 
 function Dashboard() {
     const navigate = useNavigate();
     const empleado = JSON.parse(localStorage.getItem('empleado'));
+
+    const modulos = [
+        { nombre: 'Clientes', descripcion: 'Gestiona el registro y perfil de clientes.', ruta: '/clientes', color: '#1f6feb' },
+        { nombre: 'Reservas', descripcion: 'Controla entradas, salidas y estado de reservas.', ruta: '/reservas', color: '#0f766e' },
+        { nombre: 'Habitaciones', descripcion: 'Administra disponibilidad y detalle de habitaciones.', ruta: '/habitaciones', color: '#7c3aed' },
+        { nombre: 'Inventario', descripcion: 'Supervisa stock de productos e insumos.', ruta: '/inventario', color: '#b45309' },
+        { nombre: 'Gastos', descripcion: 'Registra egresos y consulta movimientos.', ruta: '/gastos', color: '#be123c' },
+        { nombre: 'Caja', descripcion: 'Visualiza pagos, cierres y flujo de efectivo.', ruta: '/caja', color: '#155e75' },
+        { nombre: 'Empleados', descripcion: 'Gestiona usuarios internos y sus datos.', ruta: '/empleados', color: '#1d4ed8' },
+        { nombre: 'Parqueadero', descripcion: 'Controla cupos y movimientos de vehiculos.', ruta: '/parqueadero', color: '#4d7c0f' }
+    ];
 
     const handleLogout = () => {
         localStorage.removeItem('token');
@@ -11,103 +23,36 @@ function Dashboard() {
     };
 
     return (
-        <div style={styles.container}>
-            <div style={styles.header}>
-                <h1 style={styles.titulo}>Regy Hotel</h1>
-                <div style={styles.usuario}>
-                    <span>👤 {empleado?.nombre} {empleado?.apellido}</span>
-                    <button style={styles.logout} onClick={handleLogout}>Cerrar sesión</button>
+        <div className="dashboard">
+            <div className="dashboard__header">
+                <div>
+                    <p className="dashboard__eyebrow">Panel de control</p>
+                    <h1 className="dashboard__title">Regy Hotel</h1>
+                </div>
+                <div className="dashboard__user">
+                    <span className="dashboard__user-name">{empleado?.nombre} {empleado?.apellido}</span>
+                    <button className="dashboard__logout" onClick={handleLogout} type="button">
+                        Cerrar sesion
+                    </button>
                 </div>
             </div>
 
-            <div style={styles.grid}>
-                <div style={styles.card} onClick={() => navigate('/clientes')}>
-                    <span style={styles.icono}>👥</span>
-                    <h3>Clientes</h3>
-                </div>
-                <div style={styles.card} onClick={() => navigate('/reservas')}>
-                    <span style={styles.icono}>📋</span>
-                    <h3>Reservas</h3>
-                </div>
-                <div style={styles.card} onClick={() => navigate('/habitaciones')}>
-                    <span style={styles.icono}>🛏️</span>
-                    <h3>Habitaciones</h3>
-                </div>
-                <div style={styles.card} onClick={() => navigate('/inventario')}>
-                    <span style={styles.icono}>📦</span>
-                    <h3>Inventario</h3>
-                </div>
-                <div style={styles.card} onClick={() => navigate('/gastos')}>
-                    <span style={styles.icono}>💰</span>
-                    <h3>Gastos</h3>
-                </div>
-                <div style={styles.card} onClick={() => navigate('/caja')}>
-                    <span style={styles.icono}>🏧</span>
-                    <h3>Caja</h3>
-                </div>
-                <div style={styles.card} onClick={() => navigate('/empleados')}>
-                    <span style={styles.icono}>👥</span>
-                    <h3>Empleado</h3>
-                </div>
-                <div style={styles.card} onClick={() => navigate('/parqueadero')}>
-                    <span style={styles.icono}>🚗</span>
-                    <h3>Parqueadero</h3>
-                </div>
+            <div className="dashboard__grid">
+                {modulos.map((modulo) => (
+                    <button
+                        key={modulo.ruta}
+                        className="dashboard__card"
+                        onClick={() => navigate(modulo.ruta)}
+                        style={{ '--accent': modulo.color }}
+                        type="button"
+                    >
+                        <h3 className="dashboard__card-title">{modulo.nombre}</h3>
+                        <p className="dashboard__card-desc">{modulo.descripcion}</p>
+                    </button>
+                ))}
             </div>
         </div>
     );
 }
-
-const styles = {
-    container: {
-        minHeight: '100vh',
-        backgroundColor: '#f0f2f5',
-        padding: '20px'
-    },
-    header: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: '#1a1a2e',
-        color: 'white',
-        padding: '15px 25px',
-        borderRadius: '10px',
-        marginBottom: '30px'
-    },
-    titulo: {
-        margin: 0,
-        fontSize: '22px'
-    },
-    usuario: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '15px'
-    },
-    logout: {
-        backgroundColor: '#e74c3c',
-        color: 'white',
-        border: 'none',
-        padding: '8px 15px',
-        borderRadius: '6px',
-        cursor: 'pointer'
-    },
-    grid: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: '20px'
-    },
-    card: {
-        backgroundColor: 'white',
-        padding: '30px',
-        borderRadius: '10px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        textAlign: 'center',
-        cursor: 'pointer',
-        transition: 'transform 0.2s',
-    },
-    icono: {
-        fontSize: '40px'
-    }
-};
 
 export default Dashboard;
