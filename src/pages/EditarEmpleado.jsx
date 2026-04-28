@@ -231,24 +231,24 @@ function EditarEmpleado() {
         }
     };
 
-    if (loading) return <p style={{ textAlign: 'center', marginTop: '50px' }}>Cargando...</p>;
+    if (loading) return <p className="page-loading">Cargando...</p>;
 
     return (
-        <div style={styles.container}>
+        <div className="page-container">
             <PageHeader 
                 title={`Editar Empleado #${id}`}
                 onBack={() => navigate('/empleados')}
             />
 
-            <div style={styles.formulario}>
-                {error && <p style={styles.error}>{error}</p>}
-                {exito && <p style={styles.exito}>{exito}</p>}
+            <div className="panel">
+                {error && <p className="error-text">{error}</p>}
+                {exito && <p className="success-text">{exito}</p>}
 
-                <div style={styles.formGrid}>
+                <div className="form-grid form-grid--2">
                     <div>
-                        <label style={styles.label}>Nombre *</label>
+                        <label className="label">Nombre *</label>
                         <input
-                            style={styles.input}
+                            className="input-base full-width"
                             name="nombre"
                             placeholder="Nombre"
                             value={formData.nombre}
@@ -256,9 +256,9 @@ function EditarEmpleado() {
                         />
                     </div>
                     <div>
-                        <label style={styles.label}>Apellido</label>
+                        <label className="label">Apellido</label>
                         <input
-                            style={styles.input}
+                            className="input-base full-width"
                             name="apellido"
                             placeholder="Apellido"
                             value={formData.apellido}
@@ -266,9 +266,9 @@ function EditarEmpleado() {
                         />
                     </div>
                     <div>
-                        <label style={styles.label}>Telefono *</label>
+                        <label className="label">Telefono *</label>
                         <input
-                            style={styles.input}
+                            className="input-base full-width"
                             name="telefono"
                             placeholder="Telefono"
                             value={formData.telefono}
@@ -276,9 +276,9 @@ function EditarEmpleado() {
                         />
                     </div>
                     <div>
-                        <label style={styles.label}>Email *</label>
+                        <label className="label">Email *</label>
                         <input
-                            style={styles.input}
+                            className="input-base full-width"
                             name="email"
                             type="email"
                             placeholder="Email"
@@ -287,43 +287,43 @@ function EditarEmpleado() {
                         />
                     </div>
                     <div>
-                        <label style={styles.label}>Usuario</label>
+                        <label className="label">Usuario</label>
                         <input
-                            style={styles.input}
+                            className="input-base full-width"
                             name="usuario"
                             placeholder="Usuario"
                             value={formData.usuario}
                             onChange={handleChange}
                         />
                     </div>
-                    <div style={{ gridColumn: '1 / -1' }}>
-                        <label style={styles.label}>Roles *</label>
-                        <div style={styles.rolesContainer}>
+                    <div className="form-grid-span-2">
+                        <label className="label">Roles *</label>
+                        <div className="roles-container">
                             {roles.length > 0 ? (
                                 roles.map((rol) => {
                                     const rolId = Number(rol.id);
                                     const isChecked = Array.isArray(formData.rolesSeleccionados) && formData.rolesSeleccionados.some(r => Number(r) === rolId);
                                     return (
-                                        <label key={rol.id} style={styles.checkboxLabel}>
+                                        <label key={rol.id} className="checkbox-label">
                                             <input
                                                 type="checkbox"
                                                 checked={isChecked}
                                                 onChange={() => handleRolChange(rolId)}
-                                                style={styles.checkbox}
+                                                className="checkbox-input"
                                             />
                                             <span>{rol.nombre}</span>
                                         </label>
                                     );
                                 })
                             ) : (
-                                <p style={{ color: '#999' }}>No hay roles disponibles</p>
+                                <p className="muted-text mb-0">No hay roles disponibles</p>
                             )}
                         </div>
                     </div>
                     <div>
-                        <label style={styles.label}>Estado *</label>
+                        <label className="label">Estado *</label>
                         <select
-                            style={styles.input}
+                            className="select-base full-width"
                             name="activo"
                             value={formData.activo}
                             onChange={handleChange}
@@ -334,9 +334,10 @@ function EditarEmpleado() {
                     </div>
                 </div>
 
-                <div style={styles.formAcciones}>
+                <div className="form-actions">
                     <AppButton 
                         variant="primary"
+                        size="lg"
                         onClick={guardar} 
                         disabled={guardando}
                     >
@@ -344,6 +345,7 @@ function EditarEmpleado() {
                     </AppButton>
                     <AppButton 
                         variant="danger"
+                        size="lg"
                         onClick={() => navigate('/empleados')} 
                         disabled={guardando}
                     >
@@ -354,24 +356,5 @@ function EditarEmpleado() {
         </div>
     );
 }
-
-const styles = {
-    container: { padding: '20px', backgroundColor: '#f0f2f5', minHeight: '100vh' },
-    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-    titulo: { margin: 0, color: '#1a1a2e' },
-    formulario: { backgroundColor: 'white', borderRadius: '10px', padding: '25px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' },
-    formGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px', marginBottom: '20px' },
-    label: { display: 'block', fontSize: '13px', color: '#666', marginBottom: '5px' },
-    input: { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box' },
-    rolesContainer: { display: 'flex', flexWrap: 'wrap', gap: '15px', padding: '10px', backgroundColor: '#f9f9f9', borderRadius: '6px', border: '1px solid #ddd' },
-    checkboxLabel: { display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: '#333' },
-    checkbox: { cursor: 'pointer', width: '18px', height: '18px' },
-    formAcciones: { display: 'flex', gap: '10px' },
-    btnGuardar: { padding: '10px 25px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px' },
-    btnCancelar: { padding: '10px 25px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px' },
-    btnVolver: { padding: '8px 15px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    error: { color: '#e74c3c', backgroundColor: '#fde8e8', padding: '10px', borderRadius: '6px', marginBottom: '15px' },
-    exito: { color: '#2ecc71', backgroundColor: '#e8fde8', padding: '10px', borderRadius: '6px', marginBottom: '15px' }
-};
 
 export default EditarEmpleado;

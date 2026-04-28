@@ -44,11 +44,9 @@ const initialForm = {
 
 const calcularNoches = (checkIn, checkOut) => {
 	if (!checkIn || !checkOut) return 0;
-
 	const fechaEntrada = new Date(checkIn);
 	const fechaSalida = new Date(checkOut);
 	const diffMs = fechaSalida - fechaEntrada;
-
 	if (Number.isNaN(diffMs) || diffMs <= 0) return 0;
 	return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 };
@@ -75,17 +73,11 @@ const getHabitacionIdFromReserva = (reserva) => {
 };
 
 const getFechaEntradaReserva = (reserva) => (
-	reserva?.fecha_entrada
-	|| reserva?.check_in
-	|| reserva?.checkIn
-	|| null
+	reserva?.fecha_entrada || reserva?.check_in || reserva?.checkIn || null
 );
 
 const getFechaSalidaReserva = (reserva) => (
-	reserva?.fecha_salida
-	|| reserva?.check_out
-	|| reserva?.checkOut
-	|| null
+	reserva?.fecha_salida || reserva?.check_out || reserva?.checkOut || null
 );
 
 const toCurrency = (value) => {
@@ -100,8 +92,10 @@ function Reservas() {
 	const [clientes, setClientes] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [guardando, setGuardando] = useState(false);
+	const [cancelando, setCancelando] = useState(null);
 	const [form, setForm] = useState(initialForm);
 	const [busqueda, setBusqueda] = useState('');
+	const [tabActiva, setTabActiva] = useState('pendiente');
 	const [error, setError] = useState('');
 
 	useEffect(() => {
@@ -125,7 +119,6 @@ function Reservas() {
 			const reservasConDetalle = await Promise.all(
 				payload.map(async (reserva) => {
 					if (!reserva?.id) return reserva;
-
 					try {
 						const detalleRes = await reservaService.getHabitaciones(reserva.id);
 						const detalle = Array.isArray(detalleRes.data)
@@ -133,7 +126,6 @@ function Reservas() {
 							: Array.isArray(detalleRes.data?.data)
 								? detalleRes.data.data
 								: [];
-
 						return {
 							...reserva,
 							estado: fromApiEstado(reserva.estado),
@@ -141,10 +133,7 @@ function Reservas() {
 						};
 					} catch (detailErr) {
 						console.warn(`No se pudo cargar detalle de habitaciones para la reserva ${reserva.id}`, detailErr);
-						return {
-							...reserva,
-							estado: fromApiEstado(reserva.estado)
-						};
+						return { ...reserva, estado: fromApiEstado(reserva.estado) };
 					}
 				})
 			);
@@ -192,19 +181,15 @@ function Reservas() {
 		const anticipo = Number(form.anticipo) || 0;
 		const valorTotal = noches * valorNoche;
 		const saldoPendiente = Math.max(valorTotal - anticipo, 0);
-
 		return { noches, valorTotal, saldoPendiente };
 	}, [form.checkIn, form.checkOut, form.valorNoche, form.anticipo]);
 
 	const habitacionesNoDisponibles = useMemo(() => {
 		const idsNoDisponibles = new Set();
-
 		const fechaEntradaNueva = toDateSafe(form.checkIn);
 		const fechaSalidaNueva = toDateSafe(form.checkOut);
 		const tieneRangoFechas = Boolean(
-			fechaEntradaNueva
-			&& fechaSalidaNueva
-			&& fechaEntradaNueva < fechaSalidaNueva
+			fechaEntradaNueva && fechaSalidaNueva && fechaEntradaNueva < fechaSalidaNueva
 		);
 
 		if (!tieneRangoFechas) return idsNoDisponibles;
@@ -256,11 +241,7 @@ function Reservas() {
 			}));
 			return;
 		}
-
-		setForm((prev) => ({
-			...prev,
-			[name]: value
-		}));
+		setForm((prev) => ({ ...prev, [name]: value }));
 	};
 
 	const validarFormulario = () => {
@@ -268,30 +249,25 @@ function Reservas() {
 			setError('Cliente, Habitacion, Check-in y Check-out son obligatorios.');
 			return false;
 		}
-
 		if (valoresCalculados.noches <= 0) {
 			setError('La fecha de Check-out debe ser posterior al Check-in.');
 			return false;
 		}
-
 		if (habitacionesNoDisponibles.has(Number(form.habitacionId))) {
 			setError('La habitación seleccionada no está disponible para ese rango de fechas.');
 			return false;
 		}
-
 		const habitacionSeleccionada = habitaciones.find((h) => String(h.id) === String(form.habitacionId));
 		if (normalizarEstado(habitacionSeleccionada?.estado) !== 'disponible') {
 			setError('Solo puedes reservar habitaciones en estado disponible.');
 			return false;
 		}
-
 		return true;
 	};
 
 	const crearReserva = async (e) => {
 		e.preventDefault();
 		setError('');
-
 		if (!validarFormulario()) return;
 
 		const clienteId = Number(form.clienteId);
@@ -299,8 +275,6 @@ function Reservas() {
 		const valorNoche = Number(form.valorNoche) || 0;
 		const anticipo = Number(form.anticipo) || 0;
 		const hoy = new Date().toISOString().slice(0, 10);
-		const numAdultos = Number(form.numAdultos) || 0;
-		const numNinos = Number(form.numNinos) || 0;
 
 		const payload = {
 			cliente_id: clienteId,
@@ -311,8 +285,8 @@ function Reservas() {
 			fecha_salida: form.checkOut,
 			check_in: form.checkIn,
 			check_out: form.checkOut,
-			num_adultos: numAdultos,
-			num_ninos: numNinos,
+			num_adultos: Number(form.numAdultos) || 0,
+			num_ninos: Number(form.numNinos) || 0,
 			fuente: 'directa',
 			noches: valoresCalculados.noches,
 			precio_noche: valorNoche,
@@ -352,12 +326,67 @@ function Reservas() {
 		}
 	};
 
+	// ─── CONFIRMAR: pendiente → confirmada ───────────────────────────────────────
+	const confirmarReserva = async (reserva) => {
+		if (!reserva?.id) return;
+		setError('');
+		try {
+			await reservaService.updateEstado(reserva.id, 'confirmada');
+			setReservas((prev) => prev.map((r) =>
+				r.id === reserva.id ? { ...r, estado: 'confirmada' } : r
+			));
+		} catch (err) {
+			console.error('Error confirmando reserva', err);
+			const backendMessage = err?.response?.data?.message || err?.response?.data?.error;
+			setError(backendMessage || 'No se pudo confirmar la reserva.');
+		}
+	};
+
+	// ─── CANCELAR: pendiente o confirmada → cancelada ────────────────────────────
+	const cancelarReserva = async (reserva) => {
+		if (!reserva?.id) return;
+		if (!window.confirm(`¿Cancelar la reserva #${reserva.id}? Esta acción no se puede deshacer.`)) return;
+
+		setError('');
+		setCancelando(reserva.id);
+		try {
+			await reservaService.updateEstado(reserva.id, 'cancelada');
+			// Quitar de la lista visible (cancelada ya no se muestra en esta página)
+			setReservas((prev) => prev.map((r) =>
+				r.id === reserva.id ? { ...r, estado: 'cancelada' } : r
+			));
+		} catch (err) {
+			console.error('Error cancelando reserva', err);
+			const backendMessage = err?.response?.data?.message || err?.response?.data?.error;
+			setError(backendMessage || 'No se pudo cancelar la reserva.');
+		} finally {
+			setCancelando(null);
+		}
+	};
+
+	// ─── CHECK-IN: confirmada → checkin, redirige a /checkout ────────────────────
+	const hacerCheckin = async (reserva) => {
+		if (!reserva?.id) return;
+		setError('');
+		try {
+			await reservaService.updateEstado(reserva.id, 'checkin');
+			// Quitar de esta lista — ahora es responsabilidad de CheckOut page
+			setReservas((prev) => prev.filter((r) => r.id !== reserva.id));
+			navigate('/checkout', { state: { reservaId: reserva.id } });
+		} catch (err) {
+			console.error('Error haciendo checkin', err);
+			const backendMessage = err?.response?.data?.message || err?.response?.data?.error;
+			setError(backendMessage || 'No se pudo hacer el check-in.');
+		}
+	};
+
 	const etiquetaEstado = (estado) => {
 		const key = fromApiEstado(estado);
 		if (key === 'check-in') return 'CHECK-IN';
 		if (key === 'check-out') return 'CHECK-OUT';
 		if (key === 'confirmada') return 'CONFIRMADA';
 		if (key === 'pendiente') return 'PENDIENTE';
+		if (key === 'cancelada') return 'CANCELADA';
 		return String(estado || '-').toUpperCase();
 	};
 
@@ -367,51 +396,8 @@ function Reservas() {
 		if (key === 'confirmada') return '#2980b9';
 		if (key === 'check-in') return '#27ae60';
 		if (key === 'check-out') return '#c0392b';
+		if (key === 'cancelada') return '#7f8c8d';
 		return '#7f8c8d';
-	};
-
-	const siguienteEstado = (estadoActual) => {
-		const actual = fromApiEstado(estadoActual);
-		const index = ESTADOS_CICLO.indexOf(actual);
-		if (index === -1) return ESTADOS_CICLO[0];
-		if (actual === 'check-out') return null;
-		return ESTADOS_CICLO[index + 1];
-	};
-
-	const cambiarEstadoReserva = async (reserva) => {
-		if (!reserva?.id) return;
-
-		const estadoActual = fromApiEstado(getValue(reserva, 'estado'));
-		const nuevoEstado = siguienteEstado(estadoActual);
-		if (!nuevoEstado || nuevoEstado === estadoActual) return;
-
-		try {
-			await reservaService.updateEstado(reserva.id, toApiEstado(nuevoEstado));
-
-			setReservas((prev) => prev.map((r) => (
-				r.id === reserva.id
-					? { ...r, estado: nuevoEstado }
-					: r
-			)));
-		} catch (err) {
-			console.error('Error cambiando estado de reserva', err);
-			setError('No se pudo cambiar el estado de la reserva.');
-		}
-	};
-
-	const eliminarReserva = async (id) => {
-		if (!id) return;
-		if (!window.confirm('¿Eliminar esta reserva?')) return;
-
-		try {
-			await reservaService.delete(id);
-			setReservas((prev) => prev.filter((r) => r.id !== id));
-			await cargarHabitaciones();
-		} catch (err) {
-			console.error('Error eliminando reserva', err);
-			const backendMessage = err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail;
-			setError(backendMessage || 'No se pudo eliminar la reserva.');
-		}
 	};
 
 	const getValue = (reserva, ...keys) => {
@@ -441,18 +427,39 @@ function Reservas() {
 			|| clienteId;
 	};
 
+	const reservasPendientes = useMemo(() => (
+		reservas.filter((r) => fromApiEstado(getValue(r, 'estado')) === 'pendiente')
+	), [reservas]);
+
+	const reservasConfirmadas = useMemo(() => (
+		reservas.filter((r) => fromApiEstado(getValue(r, 'estado')) === 'confirmada')
+	), [reservas]);
+
+	const reservasCanceladas = useMemo(() => (
+		reservas.filter((r) => {
+			const estado = fromApiEstado(getValue(r, 'estado'));
+			return estado === 'cancelada' || estado === 'cancelado';
+		})
+	), [reservas]);
+
 	const reservasFiltradas = useMemo(() => {
 		const consulta = normalizarTexto(busqueda);
-		if (!consulta) return reservas;
 
-		return reservas.filter((reserva) => {
+		const base = tabActiva === 'pendiente'
+			? reservasPendientes
+			: tabActiva === 'confirmada'
+				? reservasConfirmadas
+				: reservasCanceladas;
+
+		if (!consulta) return base;
+
+		return base.filter((reserva) => {
 			const nombre = normalizarTexto(getClienteNombre(reserva));
 			const documento = normalizarTexto(getClienteDocumento(reserva));
 			const clienteId = normalizarTexto(getValue(reserva, 'cliente_id'));
-
 			return nombre.includes(consulta) || documento.includes(consulta) || clienteId.includes(consulta);
 		});
-	}, [busqueda, reservas, clientes]);
+	}, [busqueda, tabActiva, reservasPendientes, reservasConfirmadas, reservasCanceladas, clientes]);
 
 	const getHabitacionNumero = (reserva) => {
 		const detalle = reserva.reserva_habitaciones?.[0] || reserva.habitaciones?.[0] || null;
@@ -460,26 +467,22 @@ function Reservas() {
 		const numeroDesdeRelacion = detalle?.habitacion?.numero || detalle?.habitacion_numero || detalle?.numero;
 		const numeroDesdeReserva = getValue(reserva, 'habitacion_numero', 'numero_habitacion');
 		const numeroDesdeCatalogo = habitaciones.find((h) => String(h.id) === String(habitacionId))?.numero;
-
 		return numeroDesdeRelacion || (numeroDesdeReserva !== '-' ? numeroDesdeReserva : null) || numeroDesdeCatalogo || habitacionId || '-';
 	};
 
 	const getPrecioNoche = (reserva) => {
 		const detalle = reserva.reserva_habitaciones?.[0] || reserva.habitaciones?.[0] || null;
 		return Number(
-			detalle?.precio_noche
-			|| getValue(reserva, 'precio_noche', 'valor_noche', 'valorNoche')
+			detalle?.precio_noche || getValue(reserva, 'precio_noche', 'valor_noche', 'valorNoche')
 		) || 0;
 	};
 
 	const getNoches = (reserva) => {
 		const nochesDb = Number(getValue(reserva, 'noches')) || 0;
 		if (nochesDb > 0) return nochesDb;
-
 		const entrada = getValue(reserva, 'fecha_entrada', 'check_in', 'checkIn');
 		const salida = getValue(reserva, 'fecha_salida', 'check_out', 'checkOut');
 		if (entrada === '-' || salida === '-') return 0;
-
 		return calcularNoches(entrada, salida);
 	};
 
@@ -496,7 +499,9 @@ function Reservas() {
 					<select className="select-base full-width" name="clienteId" value={form.clienteId} onChange={onChange}>
 						<option value="">Cliente</option>
 						{clientes.map((c) => (
-							<option key={c.id} value={c.id}>{`${c.nombre || ''} ${c.apellido || ''}`.trim()} - {c.numero_documento || c.id}</option>
+							<option key={c.id} value={c.id}>
+								{`${c.nombre || ''} ${c.apellido || ''}`.trim()} - {c.numero_documento || c.id}
+							</option>
 						))}
 					</select>
 					<select className="select-base full-width" name="habitacionId" value={form.habitacionId} onChange={onChange}>
@@ -509,15 +514,14 @@ function Reservas() {
 					<input className="input-base full-width" name="checkOut" value={form.checkOut} onChange={onChange} type="date" />
 					<input className="input-base full-width" value={valoresCalculados.noches} disabled placeholder="Noches" />
 					<input className="input-base full-width" name="valorNoche" value={form.valorNoche} onChange={onChange} type="number" min="0" placeholder="Valor Noche" />
-				    <div>
+					<div>
 						<label className="label" style={{ color: '#000000', fontWeight: 400 }}>ADULTOS</label>
 						<input className="input-base full-width" name="numAdultos" value={form.numAdultos} onChange={onChange} type="number" min="1" placeholder="Ej: 1" style={{ color: '#6b7280', fontWeight: 700 }} />
-				    </div>
+					</div>
 					<div>
 						<label className="label" style={{ color: '#000000', fontWeight: 400 }}>NIÑOS</label>
 						<input className="input-base full-width" name="numNinos" value={form.numNinos} onChange={onChange} type="number" min="0" placeholder="Ej: 0" style={{ color: '#6b7280', fontWeight: 700 }} />
 					</div>
-
 					<input className="input-base full-width" value={valoresCalculados.valorTotal} disabled placeholder="Valor Total" />
 					<input className="input-base full-width" name="anticipo" value={form.anticipo} onChange={onChange} type="number" min="0" placeholder="Anticipo" />
 					<input className="input-base full-width" value={valoresCalculados.saldoPendiente} disabled placeholder="Saldo Pendiente" />
@@ -537,6 +541,30 @@ function Reservas() {
 				<p className="page-loading">Cargando reservas...</p>
 			) : (
 				<div>
+					<div className="toolbar" style={{ marginBottom: 10 }}>
+						<AppButton
+							type="button"
+							variant={tabActiva === 'pendiente' ? 'info' : 'secondary'}
+							onClick={() => setTabActiva('pendiente')}
+						>
+							Pendientes ({reservasPendientes.length})
+						</AppButton>
+						<AppButton
+							type="button"
+							variant={tabActiva === 'confirmada' ? 'info' : 'secondary'}
+							onClick={() => setTabActiva('confirmada')}
+						>
+							Confirmadas ({reservasConfirmadas.length})
+						</AppButton>
+						<AppButton
+							type="button"
+							variant={tabActiva === 'cancelada' ? 'info' : 'secondary'}
+							onClick={() => setTabActiva('cancelada')}
+						>
+							Canceladas ({reservasCanceladas.length})
+						</AppButton>
+					</div>
+
 					<div className="toolbar" style={{ marginBottom: 12 }}>
 						<input
 							className="input-base"
@@ -548,85 +576,136 @@ function Reservas() {
 						/>
 						<AppButton type="button" onClick={() => setBusqueda((prev) => prev.trim())}>Buscar</AppButton>
 					</div>
-					<div className="table-shell">
-					<table className="table-base">
-						<thead>
-							<tr>
-								<th>Cliente</th>
-								<th>Habitacion</th>
-								<th>Check-in</th>
-								<th>Check-out</th>
-								<th>Noches</th>
-								<th>Adultos</th>
-								<th>Niños</th>
-								<th>Valor Noche</th>
-								<th>Valor Total</th>
-								<th>Anticipo</th>
-								<th>Saldo Pendiente</th>
-								<th>Estado</th>
-								<th>Observaciones</th>
-								<th>Acciones</th>
-							</tr>
-						</thead>
-						<tbody>
-							{reservasFiltradas.length === 0 ? (
-								<tr>
-									<td colSpan={14} className="table-empty">
-										{busqueda.trim()
-											? 'No se encontraron reservas para esa búsqueda.'
-											: 'No hay reservas registradas.'}
-									</td>
-								</tr>
-							) : (
-								reservasFiltradas.map((r, index) => {
-									const noches = getNoches(r);
-									const valorNoche = getPrecioNoche(r);
-									const valorTotal = Number(getValue(r, 'total', 'valor_total', 'valorTotal')) || (noches * valorNoche);
-									const anticipo = Number(getValue(r, 'anticipo')) || 0;
-									const saldo = Number(getValue(r, 'saldo_pendiente', 'saldoPendiente')) || Math.max(valorTotal - anticipo, 0);
-									const fechaEntrada = getValue(r, 'fecha_entrada', 'check_in', 'checkIn');
-									const fechaSalida = getValue(r, 'fecha_salida', 'check_out', 'checkOut');
 
-									return (
-										<tr key={r.id || `${r.habitacion_id || r.habitacion || 'reserva'}-${index}`}>
-											<td>{getClienteNombre(r)}</td>
-											<td>{getHabitacionNumero(r)}</td>
-											<td>{fechaEntrada}</td>
-											<td>{fechaSalida}</td>
-											<td>{noches || '-'}</td>
-											<td>{Number(getValue(r, 'num_adultos', 'numAdultos')) || 0}</td>
-											<td>{Number(getValue(r, 'num_ninos', 'numNinos')) || 0}</td>
-											<td>$ {toCurrency(valorNoche)}</td>
-											<td>$ {toCurrency(valorTotal)}</td>
-											<td>$ {toCurrency(anticipo)}</td>
-											<td>$ {toCurrency(saldo)}</td>
-											<td>
-												<AppButton
-													size="sm"
-													style={{ backgroundColor: colorEstado(getValue(r, 'estado')) }}
-													onClick={() => cambiarEstadoReserva(r)}
-													disabled={!r.id || fromApiEstado(getValue(r, 'estado')) === 'check-out'}
-												>
-													{etiquetaEstado(getValue(r, 'estado'))}
-												</AppButton>
-											</td>
-											<td>{getValue(r, 'observaciones')}</td>
-											<td>
-												<AppButton
-													variant="danger"
-													size="sm"
-													onClick={() => eliminarReserva(r.id)}
-													disabled={!r.id}
-												>
-													Eliminar
-												</AppButton>
-											</td>
-										</tr>
-									);
-								})
-							)}
-						</tbody>
-					</table>
+					<div className="table-shell">
+						<table className="table-base">
+							<thead>
+								<tr>
+									<th>Cliente</th>
+									<th>Habitacion</th>
+									<th>Check-in</th>
+									<th>Check-out</th>
+									<th>Noches</th>
+									<th>Adultos</th>
+									<th>Niños</th>
+									<th>Valor Noche</th>
+									<th>Valor Total</th>
+									<th>Anticipo</th>
+									<th>Saldo Pendiente</th>
+									<th>Estado</th>
+									<th>Observaciones</th>
+									<th>Acciones</th>
+								</tr>
+							</thead>
+							<tbody>
+								{reservasFiltradas.length === 0 ? (
+									<tr>
+										<td colSpan={14} className="table-empty">
+											{busqueda
+												? 'No se encontraron reservas para esa búsqueda.'
+												: tabActiva === 'pendiente'
+													? 'No hay reservas pendientes.'
+													: tabActiva === 'confirmada'
+														? 'No hay reservas confirmadas.'
+														: 'No hay reservas canceladas.'}
+										</td>
+									</tr>
+								) : (
+									reservasFiltradas.map((r, index) => {
+										const noches = getNoches(r);
+										const valorNoche = getPrecioNoche(r);
+										const valorTotal = Number(getValue(r, 'total', 'valor_total', 'valorTotal')) || (noches * valorNoche);
+										const anticipo = Number(getValue(r, 'anticipo')) || 0;
+										const saldo = Number(getValue(r, 'saldo_pendiente', 'saldoPendiente')) || Math.max(valorTotal - anticipo, 0);
+										const fechaEntrada = getValue(r, 'fecha_entrada', 'check_in', 'checkIn');
+										const fechaSalida = getValue(r, 'fecha_salida', 'check_out', 'checkOut');
+										const estadoActual = fromApiEstado(getValue(r, 'estado'));
+										const esPendiente = estadoActual === 'pendiente';
+										const esConfirmada = estadoActual === 'confirmada';
+
+										return (
+											<tr key={r.id || `${r.habitacion_id || r.habitacion || 'reserva'}-${index}`}>
+												<td>{getClienteNombre(r)}</td>
+												<td>{getHabitacionNumero(r)}</td>
+												<td>{fechaEntrada}</td>
+												<td>{fechaSalida}</td>
+												<td>{noches || '-'}</td>
+												<td>{Number(getValue(r, 'num_adultos', 'numAdultos')) || 0}</td>
+												<td>{Number(getValue(r, 'num_ninos', 'numNinos')) || 0}</td>
+												<td>$ {toCurrency(valorNoche)}</td>
+												<td>$ {toCurrency(valorTotal)}</td>
+												<td>$ {toCurrency(anticipo)}</td>
+												<td>$ {toCurrency(saldo)}</td>
+
+												{/* ── Columna Estado ── */}
+												<td>
+													<span
+														style={{
+															display: 'inline-block',
+															padding: '2px 10px',
+															borderRadius: '12px',
+															fontSize: '11px',
+															fontWeight: 700,
+															backgroundColor: colorEstado(estadoActual),
+															color: '#fff',
+															letterSpacing: '0.5px'
+														}}
+													>
+														{etiquetaEstado(estadoActual)}
+													</span>
+												</td>
+
+												<td>{getValue(r, 'observaciones')}</td>
+
+												{/* ── Columna Acciones ── */}
+												<td>
+													<div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+														{tabActiva === 'cancelada' && (
+															<span style={{ color: '#64748b', fontSize: '12px', fontWeight: 600 }}>Solo lectura</span>
+														)}
+														{/* Pendiente → Confirmar */}
+														{tabActiva !== 'cancelada' && esPendiente && (
+															<AppButton
+																size="sm"
+																variant="info"
+																onClick={() => confirmarReserva(r)}
+																disabled={!r.id}
+															>
+																Confirmar
+															</AppButton>
+														)}
+
+														{/* Confirmada → Check-in */}
+														{tabActiva !== 'cancelada' && esConfirmada && (
+															<AppButton
+																size="sm"
+																style={{ backgroundColor: '#27ae60', color: '#fff' }}
+																onClick={() => hacerCheckin(r)}
+																disabled={!r.id}
+															>
+																→ Check-in
+															</AppButton>
+														)}
+
+														{/* Cancelar (disponible para pendiente y confirmada) */}
+														{tabActiva !== 'cancelada' && (esPendiente || esConfirmada) && (
+															<AppButton
+																size="sm"
+																variant="danger"
+																onClick={() => cancelarReserva(r)}
+																disabled={!r.id || cancelando === r.id}
+															>
+																{cancelando === r.id ? 'Cancelando...' : 'Cancelar'}
+															</AppButton>
+														)}
+													</div>
+												</td>
+											</tr>
+										);
+									})
+								)}
+							</tbody>
+						</table>
 					</div>
 				</div>
 			)}

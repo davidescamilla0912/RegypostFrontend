@@ -5,7 +5,56 @@ import consumoService from '../services/consumoService';
 import clienteService from '../services/clienteService';
 import empleadoService from '../services/empleadoService';
 
-function ModalHabitacion({ habitacion, onClose, onUpdate }) {
+function ModalBase({ open, onClose, width = '750px', title, subtitle, headerActions, children, footer }) {
+    useEffect(() => {
+        if (!open) return undefined;
+
+        const onKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                onClose?.();
+            }
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [open, onClose]);
+
+    if (!open) return null;
+
+    return (
+        <div style={styles.overlay} onClick={onClose}>
+            <div style={{ ...styles.modal, width }} onClick={(event) => event.stopPropagation()}>
+                <div style={styles.header}>
+                    <div>
+                        <h2 style={styles.titulo}>{title}</h2>
+                        {subtitle && <span style={styles.subtitulo}>{subtitle}</span>}
+                    </div>
+                    <div style={styles.headerActions}>
+                        {headerActions}
+                        <button style={styles.btnCerrar} onClick={onClose}>✕</button>
+                    </div>
+                </div>
+
+                <div style={styles.contenido}>{children}</div>
+
+                {footer && <div style={styles.footer}>{footer}</div>}
+            </div>
+        </div>
+    );
+}
+
+function ModalHabitacion({
+    habitacion,
+    onClose,
+    onUpdate,
+    open = false,
+    title = '',
+    subtitle = '',
+    children,
+    footer,
+    width = '750px',
+    headerActions = null
+}) {
     const navigate = useNavigate();
     const [pestana, setPestana] = useState('reserva');
     const [reserva, setReserva] = useState(null);
@@ -24,7 +73,9 @@ function ModalHabitacion({ habitacion, onClose, onUpdate }) {
     });
 
     useEffect(() => {
+        if (!habitacion) return undefined;
         cargarDatos();
+        return undefined;
     }, [habitacion]);
 
     const toNumber = (value) => {
@@ -252,47 +303,55 @@ function ModalHabitacion({ habitacion, onClose, onUpdate }) {
         return new Date(fecha).toLocaleDateString('es-CO', { timeZone: 'UTC' });
     };
 
+    if (!habitacion) {
+        return (
+            <ModalBase
+                open={open}
+                onClose={onClose}
+                width={width}
+                title={title}
+                subtitle={subtitle}
+                headerActions={headerActions}
+                footer={footer}
+            >
+                {children}
+            </ModalBase>
+        );
+    }
+
     return (
-        <div style={styles.overlay} onClick={onClose}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
-                {/* Header */}
-                <div style={styles.header}>
-                    <div>
-                        <h2 style={styles.titulo}>Hab. {habitacion.numero}</h2>
-                        <span style={styles.subtitulo}>{habitacion.tipo_nombre} — Piso {habitacion.piso}</span>
-                    </div>
-                    <div style={styles.headerActions}>
-                        {reserva && (
-                            <button style={styles.btnCaja} onClick={irACaja}>
-                                Mandar a caja
-                            </button>
-                        )}
-                        <button style={styles.btnCerrar} onClick={onClose}>✕</button>
-                    </div>
-                </div>
+        <ModalBase
+            open={Boolean(habitacion)}
+            onClose={onClose}
+            width="750px"
+            title={`Hab. ${habitacion.numero}`}
+            subtitle={`${habitacion.tipo_nombre} - Piso ${habitacion.piso}`}
+            headerActions={reserva && (
+                <button style={styles.btnCaja} onClick={irACaja}>
+                    Mandar a caja
+                </button>
+            )}
+        >
+            {/* Pestañas */}
+            <div style={styles.pestanas}>
+                {['reserva', 'huesped', 'servicios'].map(p => (
+                    <button key={p} style={{
+                        ...styles.pestana,
+                        borderBottom: pestana === p ? '3px solid #1a1a2e' : '3px solid transparent',
+                        color: pestana === p ? '#1a1a2e' : '#666',
+                        fontWeight: pestana === p ? 'bold' : 'normal'
+                    }} onClick={() => setPestana(p)}>
+                        {p === 'reserva' ? '📋 Reserva' : p === 'huesped' ? '👤 Huésped' : '🛎️ Servicios'}
+                    </button>
+                ))}
+            </div>
 
-                {/* Pestañas */}
-                <div style={styles.pestanas}>
-                    {['reserva', 'huesped', 'servicios'].map(p => (
-                        <button key={p} style={{
-                            ...styles.pestana,
-                            borderBottom: pestana === p ? '3px solid #1a1a2e' : '3px solid transparent',
-                            color: pestana === p ? '#1a1a2e' : '#666',
-                            fontWeight: pestana === p ? 'bold' : 'normal'
-                        }} onClick={() => setPestana(p)}>
-                            {p === 'reserva' ? '📋 Reserva' : p === 'huesped' ? '👤 Huésped' : '🛎️ Servicios'}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Contenido */}
-                <div style={styles.contenido}>
-                    {loading ? (
-                        <p style={styles.loading}>Cargando información...</p>
-                    ) : !reserva ? (
-                        <p style={styles.sinReserva}>No hay checkin activo en esta habitación</p>
-                    ) : (
-                        <>
+            {loading ? (
+                <p style={styles.loading}>Cargando información...</p>
+            ) : !reserva ? (
+                <p style={styles.sinReserva}>No hay checkin activo en esta habitación</p>
+            ) : (
+                <>
                             {/* PESTAÑA RESERVA */}
                             {pestana === 'reserva' && (
                                 <div>
@@ -487,11 +546,9 @@ function ModalHabitacion({ habitacion, onClose, onUpdate }) {
                                     </div>
                                 </div>
                             )}
-                        </>
-                    )}
-                </div>
-            </div>
-        </div>
+                </>
+            )}
+        </ModalBase>
     );
 }
 
@@ -504,6 +561,7 @@ const styles = {
     subtitulo: { color: '#aaa', fontSize: '13px' },
     btnCaja: { backgroundColor: '#f39c12', border: 'none', color: 'white', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' },
     btnCerrar: { backgroundColor: 'transparent', border: '1px solid #666', color: 'white', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontSize: '16px' },
+    footer: { padding: '0 25px 20px', display: 'flex', gap: '10px', flexWrap: 'wrap' },
     pestanas: { display: 'flex', borderBottom: '1px solid #eee', padding: '0 20px' },
     pestana: { padding: '12px 20px', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '14px', transition: 'all 0.2s' },
     contenido: { padding: '20px 25px', overflowY: 'auto', flex: 1 },

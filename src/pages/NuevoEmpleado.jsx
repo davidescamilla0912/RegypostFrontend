@@ -91,21 +91,21 @@ function NuevoEmpleado() {
     };
 
     return (
-        <div style={styles.container}>
+        <div className="page-container">
             <PageHeader 
                 title="Nuevo Empleado"
                 onBack={() => navigate('/empleados')}
             />
 
-            <div style={styles.formulario}>
-                {error && <p style={styles.error}>{error}</p>}
-                {exito && <p style={styles.exito}>{exito}</p>}
+            <div className="panel">
+                {error && <p className="error-text">{error}</p>}
+                {exito && <p className="success-text">{exito}</p>}
 
-                <div style={styles.formGrid}>
+                <div className="form-grid form-grid--2">
                     <div>
-                        <label style={styles.label}>Nombre *</label>
+                        <label className="label">Nombre *</label>
                         <input
-                            style={styles.input}
+                            className="input-base full-width"
                             name="nombre"
                             placeholder="Nombre"
                             value={formData.nombre}
@@ -113,9 +113,9 @@ function NuevoEmpleado() {
                         />
                     </div>
                     <div>
-                        <label style={styles.label}>Apellido</label>
+                        <label className="label">Apellido</label>
                         <input
-                            style={styles.input}
+                            className="input-base full-width"
                             name="apellido"
                             placeholder="Apellido"
                             value={formData.apellido}
@@ -123,9 +123,9 @@ function NuevoEmpleado() {
                         />
                     </div>
                     <div>
-                        <label style={styles.label}>Telefono *</label>
+                        <label className="label">Telefono *</label>
                         <input
-                            style={styles.input}
+                            className="input-base full-width"
                             name="telefono"
                             placeholder="Telefono"
                             value={formData.telefono}
@@ -133,9 +133,9 @@ function NuevoEmpleado() {
                         />
                     </div>
                     <div>
-                        <label style={styles.label}>Email *</label>
+                        <label className="label">Email *</label>
                         <input
-                            style={styles.input}
+                            className="input-base full-width"
                             name="email"
                             type="email"
                             placeholder="Email"
@@ -144,9 +144,9 @@ function NuevoEmpleado() {
                         />
                     </div>
                     <div>
-                        <label style={styles.label}>Usuario *</label>
+                        <label className="label">Usuario *</label>
                         <input
-                            style={styles.input}
+                            className="input-base full-width"
                             name="usuario"
                             placeholder="Usuario para iniciar sesion"
                             value={formData.usuario}
@@ -154,9 +154,9 @@ function NuevoEmpleado() {
                         />
                     </div>
                     <div>
-                        <label style={styles.label}>Contrasena *</label>
+                        <label className="label">Contrasena *</label>
                         <input
-                            style={styles.input}
+                            className="input-base full-width"
                             name="contrasena"
                             type="password"
                             placeholder="Contrasena"
@@ -165,9 +165,9 @@ function NuevoEmpleado() {
                         />
                     </div>
                     <div>
-                        <label style={styles.label}>Rol *</label>
+                        <label className="label">Rol *</label>
                         <select
-                            style={styles.input}
+                            className="select-base full-width"
                             name="rol_id"
                             value={formData.rol_id}
                             onChange={handleChange}
@@ -179,9 +179,9 @@ function NuevoEmpleado() {
                         </select>
                     </div>
                     <div>
-                        <label style={styles.label}>Estado *</label>
+                        <label className="label">Estado *</label>
                         <select
-                            style={styles.input}
+                            className="select-base full-width"
                             name="activo"
                             value={formData.activo}
                             onChange={handleChange}
@@ -192,9 +192,10 @@ function NuevoEmpleado() {
                     </div>
                 </div>
 
-                <div style={styles.formAcciones}>
+                <div className="form-actions">
                     <AppButton 
                         variant="success"
+                        size="lg"
                         onClick={guardar} 
                         disabled={guardando}
                     >
@@ -202,6 +203,7 @@ function NuevoEmpleado() {
                     </AppButton>
                     <AppButton 
                         variant="danger"
+                        size="lg"
                         onClick={() => navigate('/empleados')} 
                         disabled={guardando}
                     >
@@ -212,21 +214,5 @@ function NuevoEmpleado() {
         </div>
     );
 }
-
-const styles = {
-    container: { padding: '20px', backgroundColor: '#f0f2f5', minHeight: '100vh' },
-    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-    titulo: { margin: 0, color: '#1a1a2e' },
-    formulario: { backgroundColor: 'white', borderRadius: '10px', padding: '25px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' },
-    formGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px', marginBottom: '20px' },
-    label: { display: 'block', fontSize: '13px', color: '#666', marginBottom: '5px' },
-    input: { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box' },
-    formAcciones: { display: 'flex', gap: '10px' },
-    btnGuardar: { padding: '10px 25px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px' },
-    btnCancelar: { padding: '10px 25px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px' },
-    btnVolver: { padding: '8px 15px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    error: { color: '#e74c3c', backgroundColor: '#fde8e8', padding: '10px', borderRadius: '6px', marginBottom: '15px' },
-    exito: { color: '#2ecc71', backgroundColor: '#e8fde8', padding: '10px', borderRadius: '6px', marginBottom: '15px' }
-};
 
 export default NuevoEmpleado;

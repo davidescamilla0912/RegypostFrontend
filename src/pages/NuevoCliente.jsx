@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AppButton, PageHeader } from '../components/ui';
 import clienteService from '../services/clienteService';
 
 function NuevoCliente() {
@@ -39,21 +40,17 @@ function NuevoCliente() {
     };
 
     return (
-        <div style={styles.container}>
-            <div style={styles.header}>
-                <button style={styles.btnVolver} onClick={() => navigate('/clientes')}>← Volver</button>
-                <h2 style={styles.titulo}>Nuevo Cliente</h2>
-                <div />
-            </div>
+        <div className="page-container">
+            <PageHeader title="Nuevo Cliente" onBack={() => navigate('/clientes')} />
 
-            <div style={styles.formulario}>
-                {error && <p style={styles.error}>{error}</p>}
-                {exito && <p style={styles.exito}>{exito}</p>}
+            <div className="panel">
+                {error && <p className="error-text">{error}</p>}
+                {exito && <p className="success-text">{exito}</p>}
 
-                <div style={styles.formGrid}>
+                <div className="form-grid form-grid--2">
                     <div>
-                        <label style={styles.label}>Tipo Documento *</label>
-                        <select style={styles.input} name="tipo_documento"
+                        <label className="label">Tipo Documento *</label>
+                        <select className="select-base full-width" name="tipo_documento"
                             value={formData.tipo_documento} onChange={handleChange}>
                             <option value="CC">CC</option>
                             <option value="CE">CE</option>
@@ -63,90 +60,73 @@ function NuevoCliente() {
                         </select>
                     </div>
                     <div>
-                        <label style={styles.label}>Número Documento *</label>
-                        <input style={styles.input} name="numero_documento"
+                        <label className="label">Número Documento *</label>
+                        <input className="input-base full-width" name="numero_documento"
                             placeholder="Número de documento"
                             value={formData.numero_documento} onChange={handleChange} />
                     </div>
                     <div>
-                        <label style={styles.label}>Nombre *</label>
-                        <input style={styles.input} name="nombre"
+                        <label className="label">Nombre *</label>
+                        <input className="input-base full-width" name="nombre"
                             placeholder="Nombre"
                             value={formData.nombre} onChange={handleChange} />
                     </div>
                     <div>
-                        <label style={styles.label}>Apellido *</label>
-                        <input style={styles.input} name="apellido"
+                        <label className="label">Apellido *</label>
+                        <input className="input-base full-width" name="apellido"
                             placeholder="Apellido"
                             value={formData.apellido} onChange={handleChange} />
                     </div>
                     <div>
-                        <label style={styles.label}>Nacionalidad</label>
-                        <input style={styles.input} name="nacionalidad"
+                        <label className="label">Nacionalidad</label>
+                        <input className="input-base full-width" name="nacionalidad"
                             placeholder="Nacionalidad"
                             value={formData.nacionalidad} onChange={handleChange} />
                     </div>
                     <div>
-                        <label style={styles.label}>Teléfono</label>
-                        <input style={styles.input} name="telefono"
+                        <label className="label">Teléfono</label>
+                        <input className="input-base full-width" name="telefono"
                             placeholder="Teléfono"
                             value={formData.telefono} onChange={handleChange} />
                     </div>
                     <div>
-                        <label style={styles.label}>Email</label>
-                        <input style={styles.input} name="email" type="email"
+                        <label className="label">Email</label>
+                        <input className="input-base full-width" name="email" type="email"
                             placeholder="Email"
                             value={formData.email} onChange={handleChange} />
                     </div>
                     <div>
-                        <label style={styles.label}>Dirección</label>
-                        <input style={styles.input} name="direccion"
+                        <label className="label">Dirección</label>
+                        <input className="input-base full-width" name="direccion"
                             placeholder="Dirección"
                             value={formData.direccion} onChange={handleChange} />
                     </div>
                     <div>
-                        <label style={styles.label}>Empresa</label>
-                        <input style={styles.input} name="empresa"
+                        <label className="label">Empresa</label>
+                        <input className="input-base full-width" name="empresa"
                             placeholder="Empresa"
                             value={formData.empresa} onChange={handleChange} />
                     </div>
                     <div>
-                        <label style={styles.label}>Fecha Nacimiento</label>
-                        <input style={styles.input} name="fecha_nacimiento" type="date"
+                        <label className="label">Fecha Nacimiento</label>
+                        <input className="input-base full-width" name="fecha_nacimiento" type="date"
                             value={formData.fecha_nacimiento} onChange={handleChange} />
                     </div>
-                    <div style={{ gridColumn: 'span 2' }}>
-                        <label style={styles.label}>Notas</label>
-                        <textarea style={styles.textarea} name="notas"
+                    <div className="form-grid-span-2">
+                        <label className="label">Notas</label>
+                        <textarea className="input-base textarea-base full-width" name="notas"
                             placeholder="Notas adicionales"
                             value={formData.notas} onChange={handleChange} />
                     </div>
                 </div>
 
-                <div style={styles.formAcciones}>
-                    <button style={styles.btnGuardar} onClick={guardar}>Guardar Cliente</button>
-                    <button style={styles.btnCancelar} onClick={() => navigate('/clientes')}>Cancelar</button>
+                <div className="form-actions">
+                    <AppButton variant="success" size="lg" onClick={guardar}>Guardar Cliente</AppButton>
+                    <AppButton variant="danger" size="lg" onClick={() => navigate('/clientes')}>Cancelar</AppButton>
                 </div>
             </div>
         </div>
     );
 }
-
-const styles = {
-    container: { padding: '20px', backgroundColor: '#f0f2f5', minHeight: '100vh' },
-    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-    titulo: { margin: 0, color: '#1a1a2e' },
-    formulario: { backgroundColor: 'white', borderRadius: '10px', padding: '25px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' },
-    formGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px', marginBottom: '20px' },
-    label: { display: 'block', fontSize: '13px', color: '#666', marginBottom: '5px' },
-    input: { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box' },
-    textarea: { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px', boxSizing: 'border-box', height: '80px', resize: 'vertical' },
-    formAcciones: { display: 'flex', gap: '10px' },
-    btnGuardar: { padding: '10px 25px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px' },
-    btnCancelar: { padding: '10px 25px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '15px' },
-    btnVolver: { padding: '8px 15px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    error: { color: '#e74c3c', backgroundColor: '#fde8e8', padding: '10px', borderRadius: '6px', marginBottom: '15px' },
-    exito: { color: '#2ecc71', backgroundColor: '#e8fde8', padding: '10px', borderRadius: '6px', marginBottom: '15px' }
-};
 
 export default NuevoCliente;

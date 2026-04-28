@@ -9,6 +9,7 @@ import Parqueadero from './pages/Parqueadero';
 import Inventario from './pages/Inventario';
 import Gastos from './pages/Gastos';
 import Caja from './pages/Caja';
+import CheckOut from './pages/CheckOut';
 import NuevoCliente from './pages/NuevoCliente';
 import EditarCliente from './pages/EditarCliente';
 import NuevoEmpleado from './pages/NuevoEmpleado';
@@ -64,6 +65,14 @@ function App() {
                 <Route
                     path="/caja"
                     element={token ? <Caja /> : <Navigate to="/" />}
+                />
+                <Route
+                    path="/checkout"
+                    element={token ? <CheckOut /> : <Navigate to="/" />}
+                />
+                <Route
+                    path="/check-out"
+                    element={token ? <CheckOut /> : <Navigate to="/" />}
                 />
                 <Route
                     path="/clientes/nuevo"

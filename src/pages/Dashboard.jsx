@@ -12,6 +12,7 @@ function Dashboard() {
         { nombre: 'Inventario', descripcion: 'Supervisa stock de productos e insumos.', ruta: '/inventario', color: '#b45309' },
         { nombre: 'Gastos', descripcion: 'Registra egresos y consulta movimientos.', ruta: '/gastos', color: '#be123c' },
         { nombre: 'Caja', descripcion: 'Visualiza pagos, cierres y flujo de efectivo.', ruta: '/caja', color: '#155e75' },
+        { nombre: 'CheckOut', descripcion: 'Gestiona check-in, check-out y cobro final.', ruta: '/checkout', color: '#9a3412' },
         { nombre: 'Empleados', descripcion: 'Gestiona usuarios internos y sus datos.', ruta: '/empleados', color: '#1d4ed8' },
         { nombre: 'Parqueadero', descripcion: 'Controla cupos y movimientos de vehiculos.', ruta: '/parqueadero', color: '#4d7c0f' }
     ];
