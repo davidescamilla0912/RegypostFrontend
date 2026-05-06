@@ -8,10 +8,13 @@ const reservaService = {
     create: (data) => api.post('/reservas', data),
     update: (id, data) => api.put(`/reservas/${id}`, data),
     updateEstado: (id, estado) => api.patch(`/reservas/${id}/estado`, { estado }),
+    confirmar: (id, anticipo) => api.patch(`/reservas/${id}/confirmar`, { anticipo }),
     delete: (id) => api.delete(`/reservas/${id}`),
     getHabitaciones: (id) => api.get(`/reservas/${id}/habitaciones`),
     agregarHabitacion: (id, data) => api.post(`/reservas/${id}/habitaciones`, data),
-    quitarHabitacion: (reserva_id, habitacion_id) => api.delete(`/reservas/${reserva_id}/habitaciones/${habitacion_id}`)
+    quitarHabitacion: (reserva_id, habitacion_id) => api.delete(`/reservas/${reserva_id}/habitaciones/${habitacion_id}`),
+    tieneFuturas: (habitacionId) => api.get(`/reservas/habitacion/${habitacionId}/futuras`)
 };
+
 
 export default reservaService;

@@ -25,6 +25,7 @@ function Caja() {
     const [errorEdicionPago, setErrorEdicionPago] = useState('');
     const [formPago, setFormPago] = useState({
         fecha_pago: new Date().toISOString().slice(0, 10),
+        hora_pago: new Date().toISOString().slice(11, 16),
         metodo: 'efectivo',
         referencia: '',
         notas: ''
@@ -63,22 +64,7 @@ function Caja() {
         }).format(fecha);
     };
 
-    const formatFechaInput = (value) => {
-        if (!value) return new Date().toISOString().slice(0, 10);
-
-        if (typeof value === 'string') {
-            const match = value.match(/^(\d{4}-\d{2}-\d{2})/);
-            if (match?.[1]) return match[1];
-        }
-
-        const fecha = new Date(value);
-        if (Number.isNaN(fecha.getTime())) return new Date().toISOString().slice(0, 10);
-
-        const year = fecha.getUTCFullYear();
-        const month = String(fecha.getUTCMonth() + 1).padStart(2, '0');
-        const day = String(fecha.getUTCDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
+    
 
     const fechaClave = (value) => {
         if (!value) return '';
@@ -228,7 +214,8 @@ function Caja() {
         setMensajeEdicionPago('');
         setErrorEdicionPago('');
         setFormPago({
-            fecha_pago: formatFechaInput(pago?.fecha_pago || pago?.fecha),
+            fecha_pago: (pago?.fecha_pago || pago?.fecha || '').substring(0, 10),
+            hora_pago: (pago?.fecha_pago || pago?.fecha || '').substring(11, 16) || '00:00',
             metodo: pago?.metodo || 'efectivo',
             referencia: pago?.referencia || '',
             notas: pago?.notas || ''
@@ -241,6 +228,7 @@ function Caja() {
         setErrorEdicionPago('');
         setFormPago({
             fecha_pago: new Date().toISOString().slice(0, 10),
+            hora_pago: new Date().toISOString().slice(11, 16),
             metodo: 'efectivo',
             referencia: '',
             notas: ''
@@ -255,13 +243,17 @@ function Caja() {
             setMensajeEdicionPago('');
             setErrorEdicionPago('');
 
+            const fechaPagoCompleta = `${formPago.fecha_pago}T${formPago.hora_pago}:00`;
+            const fecha = new Date(fechaPagoCompleta);
+            const fechaPagoIso = fecha.toISOString();
+
             await pagoService.update(editandoPago.id, {
                 reserva_id: editandoPago.reserva_id || null,
                 empleado_id: editandoPago.empleado_id || null,
                 monto: editandoPago.monto,
                 metodo: formPago.metodo,
                 referencia: formPago.referencia?.trim() || '',
-                fecha_pago: formPago.fecha_pago || new Date().toISOString().slice(0, 10),
+                fecha_pago: fechaPagoIso,
                 notas: formPago.notas?.trim() || ''
             });
 
@@ -297,6 +289,7 @@ function Caja() {
         setFormPago((prev) => ({
             ...prev,
             fecha_pago: prev.fecha_pago || new Date().toISOString().slice(0, 10),
+            hora_pago: prev.hora_pago || new Date().toISOString().slice(11, 16),
             notas: prev.notas || buildNotasPago()
         }));
     }, [pagoResumen]);
@@ -309,19 +302,33 @@ function Caja() {
             setMensajePago('');
             setErrorPago('');
 
+            const fechaPagoCompleta = `${formPago.fecha_pago}T${formPago.hora_pago}:00`;
+            const fecha = new Date(fechaPagoCompleta);
+            const fechaPagoIso = fecha.toISOString();
+
             const payload = {
                 reserva_id: reservaCaja.id,
                 empleado_id: pagoDesdeHabitacion?.empleado_id || getEmpleadoSesionId() || null,
                 monto: pagoResumen.totalFinal,
                 metodo: formPago.metodo,
                 referencia: formPago.referencia?.trim() || '',
-                fecha_pago: formPago.fecha_pago || new Date().toISOString().slice(0, 10),
+                fecha_pago: fechaPagoIso,
                 notas: formPago.notas?.trim() || buildNotasPago()
             };
 
+            // validar monto (si se admite pago parcial, no bloqueamos; solo avisamos)
+            const esperado = Number(pagoResumen.totalFinal || 0);
+            if (Number(payload.monto) < esperado) {
+                setMensajePago(`Pago parcial registrado: faltan ${formatMoney(esperado - Number(payload.monto))}`);
+            } else {
+                setMensajePago('Pago registrado correctamente en la tabla pagos.');
+            }
+
             await pagoService.create(payload);
-            setMensajePago('Pago registrado correctamente en la tabla pagos.');
             await cargarPagos();
+
+            // Redirigir a CheckOut para que se vea el cambio (se pasa reservaId para expandirla)
+            navigate('/checkout', { state: { reservaId: reservaCaja.id } });
         } catch (err) {
             console.error('Error guardando pago', err);
             const backendMessage = err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail;
@@ -501,6 +508,15 @@ function Caja() {
                                 />
                             </div>
                             <div>
+                                <label className="label">Hora de pago</label>
+                                <input
+                                    className="input-base full-width"
+                                    type="time"
+                                    value={formPago.hora_pago}
+                                    onChange={(e) => setFormPago((prev) => ({ ...prev, hora_pago: e.target.value }))}
+                                />
+                            </div>
+                            <div>
                                 <label className="label">Método</label>
                                 <select
                                     className="select-base full-width"
@@ -652,6 +668,15 @@ function Caja() {
                                 type="date"
                                 value={formPago.fecha_pago}
                                 onChange={(e) => setFormPago((prev) => ({ ...prev, fecha_pago: e.target.value }))}
+                            />
+                        </div>
+                        <div>
+                            <label className="label">Hora de pago</label>
+                            <input
+                                className="input-base full-width"
+                                type="time"
+                                value={formPago.hora_pago}
+                                onChange={(e) => setFormPago((prev) => ({ ...prev, hora_pago: e.target.value }))}
                             />
                         </div>
                         <div>

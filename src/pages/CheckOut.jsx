@@ -4,6 +4,7 @@ import reservaService from '../services/reservaService';
 import clienteService from '../services/clienteService';
 import habitacionService from '../services/habitacionService';
 import consumoService from '../services/consumoService';
+import pagoService from '../services/pagoService';
 import { AppButton, PageHeader } from '../components/ui';
 import '../components/ui/ui.css';
 
@@ -111,15 +112,45 @@ function CheckOut() {
             const checkins  = normalizarLista(resCheckin);
             const checkouts = normalizarLista(resCheckout);
 
+            // Obtener pagos para calcular suma por reserva
+            let pagosLista = [];
+            try {
+                const resPagos = await pagoService.getAll();
+                pagosLista = normalizarLista(resPagos);
+            } catch (e) {
+                pagosLista = [];
+            }
+            const pagosSumByReserva = pagosLista.reduce((acc, p) => {
+                const id = p?.reserva_id;
+                if (!id) return acc;
+                acc[id] = (acc[id] || 0) + Number(p.monto || 0);
+                return acc;
+            }, {});
+
             // Para cada reserva en checkin, traer también sus habitaciones
             const checkinConDetalle = await Promise.all(
                 checkins.map(async (r) => {
                     try {
                         const dRes = await reservaService.getHabitaciones(r.id);
                         const detalle = normalizarLista(dRes);
-                        return { ...r, estado: fromApiEstado(r.estado), reserva_habitaciones: detalle };
+                        // obtener consumos para calcular total a cobrar
+                        let consumos = [];
+                        try {
+                            const resCons = await consumoService.getByReserva(r.id);
+                            consumos = normalizarLista(resCons);
+                        } catch {}
+                        const totalConsumos = consumos.reduce((s, c) => s + Number(c.total || 0), 0);
+                        const totalReserva = Number(r.total || r.valor_total || 0) || 0;
+                        const anticipo = Number(r.anticipo) || 0;
+                        const saldoPendiente = Math.max(totalReserva - anticipo, 0);
+                        const totalARecaudar = saldoPendiente + totalConsumos;
+                        const pagosSum = pagosSumByReserva[r.id] || 0;
+                        const pagado = pagosSum >= totalARecaudar && totalARecaudar > 0;
+                        return { ...r, estado: fromApiEstado(r.estado), reserva_habitaciones: detalle, pagado };
                     } catch {
-                        return { ...r, estado: fromApiEstado(r.estado), reserva_habitaciones: [] };
+                        const pagosSum = pagosSumByReserva[r.id] || 0;
+                        const pagado = pagosSum > 0;
+                        return { ...r, estado: fromApiEstado(r.estado), reserva_habitaciones: [], pagado };
                     }
                 })
             );
@@ -129,9 +160,23 @@ function CheckOut() {
                     try {
                         const dRes = await reservaService.getHabitaciones(r.id);
                         const detalle = normalizarLista(dRes);
-                        return { ...r, estado: fromApiEstado(r.estado), reserva_habitaciones: detalle };
+                        let consumos = [];
+                        try {
+                            const resCons = await consumoService.getByReserva(r.id);
+                            consumos = normalizarLista(resCons);
+                        } catch {}
+                        const totalConsumos = consumos.reduce((s, c) => s + Number(c.total || 0), 0);
+                        const totalReserva = Number(r.total || r.valor_total || 0) || 0;
+                        const anticipo = Number(r.anticipo) || 0;
+                        const saldoPendiente = Math.max(totalReserva - anticipo, 0);
+                        const totalARecaudar = saldoPendiente + totalConsumos;
+                        const pagosSum = pagosSumByReserva[r.id] || 0;
+                        const pagado = pagosSum >= totalARecaudar && totalARecaudar > 0;
+                        return { ...r, estado: fromApiEstado(r.estado), reserva_habitaciones: detalle, pagado };
                     } catch {
-                        return { ...r, estado: fromApiEstado(r.estado), reserva_habitaciones: [] };
+                        const pagosSum = pagosSumByReserva[r.id] || 0;
+                        const pagado = pagosSum > 0;
+                        return { ...r, estado: fromApiEstado(r.estado), reserva_habitaciones: [], pagado };
                     }
                 })
             );
@@ -491,14 +536,24 @@ function CheckOut() {
                                                         >
                                                             {abierta ? 'Ocultar' : 'Ver detalle'}
                                                         </AppButton>
-                                                        <AppButton
-                                                            size="sm"
-                                                            variant="info"
-                                                            onClick={() => irACaja(reserva)}
-                                                            disabled={enProceso}
-                                                        >
-                                                            💳 Ir a Caja
-                                                        </AppButton>
+                                                        {reserva.pagado ? (
+                                                            <span style={{
+                                                                padding: '4px 10px', borderRadius: '12px', fontSize: '12px',
+                                                                fontWeight: 700, backgroundColor: '#27ae60', color: '#fff',
+                                                                display: 'inline-block', alignSelf: 'center'
+                                                            }}>
+                                                                RESERVA PAGADA
+                                                            </span>
+                                                        ) : (
+                                                            <AppButton
+                                                                size="sm"
+                                                                variant="info"
+                                                                onClick={() => irACaja(reserva)}
+                                                                disabled={enProceso}
+                                                            >
+                                                                💳 Ir a Caja
+                                                            </AppButton>
+                                                        )}
                                                         <AppButton
                                                             size="sm"
                                                             style={{ backgroundColor: '#c0392b', color: '#fff' }}
@@ -561,9 +616,13 @@ function CheckOut() {
                                                                 <span>Anticipo: <strong>{toCurrency(anticipo)}</strong></span>
                                                                 <span>Saldo pendiente: <strong>{toCurrency(saldo)}</strong></span>
                                                                 <span>Consumos: <strong>{toCurrency(totalConsumos)}</strong></span>
-                                                                <span style={{ color: '#c0392b' }}>
-                                                                    Total a cobrar: <strong>{toCurrency(saldo + totalConsumos)}</strong>
-                                                                </span>
+                                                                {reserva.pagado ? (
+                                                                    <span style={{ color: '#27ae60', fontWeight: 700 }}>Reserva pagada</span>
+                                                                ) : (
+                                                                    <span style={{ color: '#c0392b' }}>
+                                                                                                        Total a cobrar: <strong>{toCurrency(saldo + totalConsumos)}</strong>
+                                                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </div>
 
@@ -621,13 +680,20 @@ function CheckOut() {
                                                             >
                                                                 Ir a Habitaciones
                                                             </AppButton>
-                                                            <AppButton
-                                                                variant="info"
-                                                                onClick={() => irACaja(reserva)}
-                                                                disabled={enProceso}
-                                                            >
-                                                                💳 Ir a Caja con consumos
-                                                            </AppButton>
+                                                            {reserva.pagado ? (
+                                                                <span style={{
+                                                                    padding: '6px 10px', borderRadius: '10px', backgroundColor: '#27ae60', color: '#fff', fontWeight: 700,
+                                                                    display: 'inline-block', alignSelf: 'center'
+                                                                }}>Reserva pagada</span>
+                                                            ) : (
+                                                                <AppButton
+                                                                    variant="info"
+                                                                    onClick={() => irACaja(reserva)}
+                                                                    disabled={enProceso}
+                                                                >
+                                                                    💳 Ir a Caja con consumos
+                                                                </AppButton>
+                                                            )}
                                                             <AppButton
                                                                 style={{ backgroundColor: '#c0392b', color: '#fff' }}
                                                                 onClick={() => hacerCheckout(reserva)}

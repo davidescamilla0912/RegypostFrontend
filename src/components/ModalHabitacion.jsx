@@ -63,6 +63,8 @@ function ModalHabitacion({
     const [empleadoNombre, setEmpleadoNombre] = useState('');
     const [consumos, setConsumos] = useState([]);
     const [tiposConsumo, setTiposConsumo] = useState([]);
+    const [reservasFuturas, setReservasFuturas] = useState([]);
+    const [mostrarProximas, setMostrarProximas] = useState(false);
     const [loading, setLoading] = useState(true);
     const [formServicio, setFormServicio] = useState({
         tipo_consumo_id: '',
@@ -77,6 +79,16 @@ function ModalHabitacion({
         cargarDatos();
         return undefined;
     }, [habitacion]);
+
+    // Si después de cargar no hay reserva activa ni futuras, cierra el modal
+    useEffect(() => {
+        if (loading) return; // Esperar a que termine de cargar
+        
+        if (!reserva && (!reservasFuturas || reservasFuturas.length === 0)) {
+            // Sin reservas activas ni futuras: cerrar modal directamente
+            onClose?.();
+        }
+    }, [loading, reserva, reservasFuturas, onClose]);
 
     const toNumber = (value) => {
         const n = Number(value);
@@ -158,21 +170,26 @@ function ModalHabitacion({
             setLoading(true);
             setClienteDetalle(null);
             setEmpleadoNombre('');
-            // 1. Obtener reservas en checkin
+            setReservasFuturas([]);
+            setReserva(null); // Limpiar reserva anterior
+            
+            // 1. Obtener reservas en checkin (normalizar array)
             const resReservas = await reservaService.getByEstado('checkin');
-            // 2. Buscar la reserva de esta habitación
-            const reservasCheckin = resReservas.data;
+            const reservasCheckin = Array.isArray(resReservas.data) ? resReservas.data : (resReservas.data?.data || []);
             
             let reservaEncontrada = null;
             let habitacionReservaEncontrada = null;
 
-            for (const r of reservasCheckin) {
-                const resHabs = await reservaService.getHabitaciones(r.id);
-                const habEnReserva = resHabs.data.find(h => h.habitacion_id === habitacion.id);
-                if (habEnReserva) {
-                    reservaEncontrada = r;
-                    habitacionReservaEncontrada = habEnReserva;
-                    break;
+            if (Array.isArray(reservasCheckin) && reservasCheckin.length > 0) {
+                for (const r of reservasCheckin) {
+                    const resHabs = await reservaService.getHabitaciones(r.id);
+                    const habsArray = Array.isArray(resHabs.data) ? resHabs.data : (resHabs.data?.data || []);
+                    const habEnReserva = habsArray.find(h => h.habitacion_id === habitacion.id);
+                    if (habEnReserva) {
+                        reservaEncontrada = r;
+                        habitacionReservaEncontrada = habEnReserva;
+                        break;
+                    }
                 }
             }
 
@@ -184,10 +201,50 @@ function ModalHabitacion({
                 setConsumos(resConsumos.data);
             }
 
+            // 3. Cargar TODAS las reservas (futuras) para esta habitación
+            try {
+                const todasReservas = await reservaService.getAll();
+                const payload = Array.isArray(todasReservas.data) ? todasReservas.data : todasReservas.data?.data || [];
+                
+                const hoy = new Date();
+                hoy.setHours(0, 0, 0, 0);
+                
+                const futuras = [];
+                for (const r of payload) {
+                    // Obtener habitaciones de la reserva (normalizar)
+                    try {
+                        const resHabs = await reservaService.getHabitaciones(r.id);
+                        const habsArray = Array.isArray(resHabs.data) ? resHabs.data : (resHabs.data?.data || []);
+                        const habEnReserva = habsArray.find(h => h.habitacion_id === habitacion.id);
+                        
+                        if (habEnReserva) {
+                            const fechaEntrada = new Date(r.fecha_entrada);
+                            fechaEntrada.setHours(0, 0, 0, 0);
+                            
+                            // Solo mostrar reservas futuras y que no estén canceladas (y no sean la actual)
+                            const esActual = reservaEncontrada && r.id === reservaEncontrada.id;
+                            if (fechaEntrada >= hoy && r.estado !== 'cancelada' && !esActual) {
+                                futuras.push({ ...r, habitacion_detalle: habEnReserva });
+                            }
+                        }
+                    } catch (err) {
+                        console.warn('Error cargando habitaciones de reserva', err);
+                    }
+                }
+                
+                // Ordenar por fecha
+                futuras.sort((a, b) => new Date(a.fecha_entrada) - new Date(b.fecha_entrada));
+                setReservasFuturas(futuras);
+            } catch (err) {
+                console.warn('Error cargando reservas futuras', err);
+            }
+
             const resTipos = await consumoService.getTipos();
             setTiposConsumo(resTipos.data);
         } catch (err) {
             console.error('Error cargando datos', err);
+            setReserva(null);
+            setReservasFuturas([]);
         } finally {
             setLoading(false);
         }
@@ -344,6 +401,17 @@ function ModalHabitacion({
                         {p === 'reserva' ? '📋 Reserva' : p === 'huesped' ? '👤 Huésped' : '🛎️ Servicios'}
                     </button>
                 ))}
+                {reservasFuturas.length > 0 && (
+                    <button style={{
+                        ...styles.pestana,
+                        marginLeft: 'auto',
+                        color: '#f39c12',
+                        fontWeight: 'bold',
+                        borderBottom: mostrarProximas ? '3px solid #f39c12' : 'none'
+                    }} onClick={() => setMostrarProximas(!mostrarProximas)}>
+                        📅 Próximas ({reservasFuturas.length})
+                    </button>
+                )}
             </div>
 
             {loading ? (
@@ -352,74 +420,74 @@ function ModalHabitacion({
                 <p style={styles.sinReserva}>No hay checkin activo en esta habitación</p>
             ) : (
                 <>
-                            {/* PESTAÑA RESERVA */}
-                            {pestana === 'reserva' && (
-                                <div>
-                                    <div style={styles.grid2}>
-                                        <div style={styles.seccion}>
-                                            <h4 style={styles.seccionTitulo}>📅 Fechas</h4>
-                                            <div style={styles.fila}>
-                                                <span style={styles.etiqueta}>Check-in</span>
-                                                <span style={styles.valor}>{formatFecha(reserva.fecha_entrada)}</span>
-                                            </div>
-                                            <div style={styles.fila}>
-                                                <span style={styles.etiqueta}>Check-out</span>
-                                                <span style={styles.valor}>{formatFecha(reserva.fecha_salida)}</span>
-                                            </div>
-                                            <div style={styles.fila}>
-                                                <span style={styles.etiqueta}>Noches</span>
-                                                <span style={styles.valor}>{calcularNoches()}</span>
-                                            </div>
-                                            <div style={styles.fila}>
-                                                <span style={styles.etiqueta}>Adultos</span>
-                                                <span style={styles.valor}>{reserva.num_adultos}</span>
-                                            </div>
-                                            <div style={styles.fila}>
-                                                <span style={styles.etiqueta}>Niños</span>
-                                                <span style={styles.valor}>{reserva.num_ninos}</span>
-                                            </div>
-                                            <div style={styles.fila}>
-                                                <span style={styles.etiqueta}>Fuente</span>
-                                                <span style={styles.valor}>{reserva.fuente}</span>
-                                            </div>
-                                        </div>
-
-                                        <div style={styles.seccion}>
-                                            <h4 style={styles.seccionTitulo}>💰 Financiero</h4>
-                                            <div style={styles.fila}>
-                                                <span style={styles.etiqueta}>Precio/noche</span>
-                                                <span style={styles.valor}>${parseFloat(habitacionReserva?.precio_noche || 0).toLocaleString()}</span>
-                                            </div>
-                                            <div style={styles.fila}>
-                                                <span style={styles.etiqueta}>Total reserva</span>
-                                                <span style={styles.valor}>${totalReserva.toLocaleString()}</span>
-                                            </div>
-                                            <div style={styles.fila}>
-                                                <span style={styles.etiqueta}>Anticipo</span>
-                                                <span style={{ ...styles.valor, color: '#2ecc71' }}>${anticipo.toLocaleString()}</span>
-                                            </div>
-                                            <div style={styles.fila}>
-                                                <span style={styles.etiqueta}>Saldo pendiente</span>
-                                                <span style={{ ...styles.valor, color: '#e74c3c', fontWeight: 'bold' }}>${parseFloat(reserva.saldo_pendiente || 0).toLocaleString()}</span>
-                                            </div>
-                                            <div style={styles.fila}>
-                                                <span style={styles.etiqueta}>Consumos</span>
-                                                <span style={{ ...styles.valor, color: '#f39c12' }}>${totalConsumos.toLocaleString()}</span>
-                                            </div>
-                                            <div style={styles.fila}>
-                                                <span style={styles.etiqueta}>Total final</span>
-                                                <span style={{ ...styles.valor, color: '#1a1a2e', fontWeight: 'bold' }}>${totalFinal.toLocaleString()}</span>
-                                            </div>
-                                        </div>
+                    {/* PESTAÑA RESERVA */}
+                    {pestana === 'reserva' && (
+                        <div>
+                            <div style={styles.grid2}>
+                                <div style={styles.seccion}>
+                                    <h4 style={styles.seccionTitulo}>📅 Fechas</h4>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Check-in</span>
+                                        <span style={styles.valor}>{formatFecha(reserva.fecha_entrada)}</span>
                                     </div>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Check-out</span>
+                                        <span style={styles.valor}>{formatFecha(reserva.fecha_salida)}</span>
+                                    </div>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Noches</span>
+                                        <span style={styles.valor}>{calcularNoches()}</span>
+                                    </div>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Adultos</span>
+                                        <span style={styles.valor}>{reserva.num_adultos}</span>
+                                    </div>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Niños</span>
+                                        <span style={styles.valor}>{reserva.num_ninos}</span>
+                                    </div>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Fuente</span>
+                                        <span style={styles.valor}>{reserva.fuente}</span>
+                                    </div>
+                                </div>
 
-                                    {reserva.observaciones && (
-                                        <div style={styles.observaciones}>
-                                            <strong>Observaciones:</strong> {reserva.observaciones}
-                                        </div>
-                                    )}
+                                <div style={styles.seccion}>
+                                    <h4 style={styles.seccionTitulo}>💰 Financiero</h4>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Precio/noche</span>
+                                        <span style={styles.valor}>${parseFloat(habitacionReserva?.precio_noche || 0).toLocaleString()}</span>
+                                    </div>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Total reserva</span>
+                                        <span style={styles.valor}>${totalReserva.toLocaleString()}</span>
+                                    </div>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Anticipo</span>
+                                        <span style={{ ...styles.valor, color: '#2ecc71' }}>${anticipo.toLocaleString()}</span>
+                                    </div>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Saldo pendiente</span>
+                                        <span style={{ ...styles.valor, color: '#e74c3c', fontWeight: 'bold' }}>${parseFloat(reserva.saldo_pendiente || 0).toLocaleString()}</span>
+                                    </div>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Consumos</span>
+                                        <span style={{ ...styles.valor, color: '#f39c12' }}>${totalConsumos.toLocaleString()}</span>
+                                    </div>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Total final</span>
+                                        <span style={{ ...styles.valor, color: '#1a1a2e', fontWeight: 'bold' }}>${totalFinal.toLocaleString()}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {reserva.observaciones && (
+                                <div style={styles.observaciones}>
+                                    <strong>Observaciones:</strong> {reserva.observaciones}
                                 </div>
                             )}
+                        </div>
+                    )}
 
                             {/* PESTAÑA HUÉSPED */}
                             {pestana === 'huesped' && (
@@ -548,6 +616,79 @@ function ModalHabitacion({
                             )}
                 </>
             )}
+
+            {/* MODAL MODAL PARA PRÓXIMAS LLEGADAS */}
+            {mostrarProximas && (
+                <div style={styles.overlay} onClick={() => setMostrarProximas(false)}>
+                    <div style={{ ...styles.modal, width: '800px' }} onClick={(event) => event.stopPropagation()}>
+                        <div style={styles.header}>
+                            <div>
+                                <h2 style={styles.titulo}>📅 Próximas Llegadas</h2>
+                                <span style={styles.subtitulo}>{habitacion.numero} - {habitacion.tipo_nombre}</span>
+                            </div>
+                            <button style={styles.btnCerrar} onClick={() => setMostrarProximas(false)}>✕</button>
+                        </div>
+
+                        <div style={styles.contenido}>
+                            {reservasFuturas.length === 0 ? (
+                                <p style={styles.sinReserva}>No hay reservas futuras programadas para esta habitación</p>
+                            ) : (
+                                <div style={styles.listaProximas}>
+                                    {reservasFuturas.map((r) => {
+                                        const noches = Math.round((new Date(r.fecha_salida) - new Date(r.fecha_entrada)) / (1000 * 60 * 60 * 24));
+                                        return (
+                                            <div key={r.id} style={styles.tarjetaProximaGrande}>
+                                                <div style={styles.tarjetaHeaderGrande}>
+                                                    <div>
+                                                        <span style={styles.numeroReservaGrande}>Reserva #{r.id}</span>
+                                                        <span style={{...styles.badge, backgroundColor: r.estado === 'confirmada' ? '#2ecc71' : '#f39c12', marginLeft: '10px'}}>
+                                                            {r.estado?.toUpperCase()}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div style={styles.grid2}>
+                                                    <div>
+                                                        <div style={styles.filaProxima}>
+                                                            <span style={styles.etiqueta}>Huésped</span>
+                                                            <span style={{...styles.valor, fontWeight: 'bold', fontSize: '14px'}}>{r.cliente_nombre || '-'}</span>
+                                                        </div>
+                                                        <div style={styles.filaProxima}>
+                                                            <span style={styles.etiqueta}>Check-in</span>
+                                                            <span style={styles.valor}>{formatFecha(r.fecha_entrada)}</span>
+                                                        </div>
+                                                        <div style={styles.filaProxima}>
+                                                            <span style={styles.etiqueta}>Check-out</span>
+                                                            <span style={styles.valor}>{formatFecha(r.fecha_salida)}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div style={styles.filaProxima}>
+                                                            <span style={styles.etiqueta}>Noches</span>
+                                                            <span style={{...styles.valor, fontWeight: 'bold'}}>{noches}</span>
+                                                        </div>
+                                                        <div style={styles.filaProxima}>
+                                                            <span style={styles.etiqueta}>Total</span>
+                                                            <span style={{...styles.valor, color: '#2ecc71', fontWeight: 'bold'}}>
+                                                                ${parseFloat(r.total || 0).toLocaleString()}
+                                                            </span>
+                                                        </div>
+                                                        <div style={styles.filaProxima}>
+                                                            <span style={styles.etiqueta}>Anticipo</span>
+                                                            <span style={{...styles.valor, color: '#f39c12'}}>
+                                                                ${parseFloat(r.anticipo || 0).toLocaleString()}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </ModalBase>
     );
 }
@@ -584,7 +725,40 @@ const styles = {
     tr: { borderBottom: '1px solid #eee' },
     td: { padding: '8px 10px', color: '#333' },
     btnEliminar: { backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '12px' },
-    totalConsumos: { textAlign: 'right', marginTop: '10px', fontSize: '14px', color: '#333' }
+    totalConsumos: { textAlign: 'right', marginTop: '10px', fontSize: '14px', color: '#333' },
+    
+    // ESTILOS PARA PRÓXIMAS LLEGADAS MODAL
+    listaProximas: { display: 'flex', flexDirection: 'column', gap: '12px' },
+    tarjetaProximaGrande: { 
+        backgroundColor: '#f9f9f9', 
+        border: '1px solid #e0e0e0', 
+        borderRadius: '8px', 
+        padding: '14px', 
+        borderLeft: '4px solid #f39c12' 
+    },
+    tarjetaHeaderGrande: { 
+        marginBottom: '10px', 
+        paddingBottom: '10px', 
+        borderBottom: '1px solid #eee' 
+    },
+    numeroReservaGrande: { 
+        fontWeight: 'bold', 
+        fontSize: '15px', 
+        color: '#1a1a2e' 
+    },
+    badge: { 
+        padding: '3px 8px', 
+        borderRadius: '4px', 
+        fontSize: '11px', 
+        fontWeight: 'bold', 
+        color: 'white' 
+    },
+    filaProxima: { 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        padding: '5px 0', 
+        borderBottom: '1px solid #f0f0f0' 
+    }
 };
 
 export default ModalHabitacion;
