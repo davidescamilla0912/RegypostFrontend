@@ -4,6 +4,7 @@ import reservaService from '../services/reservaService';
 import consumoService from '../services/consumoService';
 import clienteService from '../services/clienteService';
 import empleadoService from '../services/empleadoService';
+import habitacionService from '../services/habitacionService';
 
 function ModalBase({ open, onClose, width = '750px', title, subtitle, headerActions, children, footer }) {
     useEffect(() => {
@@ -65,6 +66,19 @@ function ModalHabitacion({
     const [tiposConsumo, setTiposConsumo] = useState([]);
     const [reservasFuturas, setReservasFuturas] = useState([]);
     const [mostrarProximas, setMostrarProximas] = useState(false);
+    const [mostrarExtender, setMostrarExtender] = useState(false);
+    const [mostrarCambio, setMostrarCambio]               = useState(false);
+    const [habitacionesCambio, setHabitacionesCambio]     = useState([]);
+    const [cargandoHabs, setCargandoHabs]                 = useState(false);
+    const [habSeleccionada, setHabSeleccionada]           = useState(null);
+    const [motivoCambio, setMotivoCambio]                 = useState('');
+    const [errorCambio, setErrorCambio]                   = useState('');
+    const [guardandoCambio, setGuardandoCambio]           = useState(false);
+    const [exitoCambio, setExitoCambio]                   = useState(null); // {origen, destino}
+
+    const [diasExtra, setDiasExtra] = useState(1);
+    const [guardandoExtension, setGuardandoExtension] = useState(false);
+    const [errorExtension, setErrorExtension] = useState('');
     const [loading, setLoading] = useState(true);
     const [formServicio, setFormServicio] = useState({
         tipo_consumo_id: '',
@@ -73,6 +87,7 @@ function ModalHabitacion({
         precio_unitario: 0,
         fecha: new Date().toISOString().split('T')[0]
     });
+    const [formServicioPagado, setFormServicioPagado] = useState(false);
 
     useEffect(() => {
         if (!habitacion) return undefined;
@@ -250,6 +265,108 @@ function ModalHabitacion({
         }
     };
 
+    const extenderReserva = async () => {
+        if (!reserva?.id || diasExtra < 1) return;
+        setErrorExtension('');
+        setGuardandoExtension(true);
+        try {
+            const res = await reservaService.extender(reserva.id, Number(diasExtra));
+            const datos = res.data;
+
+            setReserva((prev) => ({
+                ...prev,
+                fecha_salida: datos.nueva_fecha_salida,
+                total: datos.nuevo_total,
+                saldo_pendiente: datos.nuevo_saldo
+            }));
+
+            setMostrarExtender(false);
+            setDiasExtra(1);
+            onUpdate?.();
+        } catch (err) {
+            const msg = err?.response?.data?.error || 'No se pudo extender la reserva';
+            setErrorExtension(msg);
+        } finally {
+            setGuardandoExtension(false);
+        }
+    };
+
+    const cargarHabitacionesCambio = async () => {
+    if (!reserva?.id) return;
+    setCargandoHabs(true);
+    setErrorCambio('');
+    setHabSeleccionada(null);
+    try {
+        // Ajusta BASE_URL a tu configuración real (api.js, env, etc.)
+        const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const token    = localStorage.getItem('token') || '';
+        const res = await fetch(
+            `${BASE_URL}/reservas/${reserva.id}/habitaciones-para-cambio`,
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!res.ok) throw new Error('Error al cargar habitaciones');
+        const data = await res.json();
+        setHabitacionesCambio(data);
+    } catch (err) {
+        setErrorCambio('No se pudieron cargar las habitaciones disponibles');
+    } finally {
+        setCargandoHabs(false);
+    }
+};
+
+const ejecutarCambio = async () => {
+    if (!habSeleccionada || !motivoCambio.trim()) {
+        setErrorCambio('Seleccioná una habitación y escribí el motivo');
+        return;
+    }
+    setGuardandoCambio(true);
+    setErrorCambio('');
+    try {
+        const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const token    = localStorage.getItem('token') || '';
+        const res = await fetch(
+            `${BASE_URL}/reservas/${reserva.id}/cambiar-habitacion`,
+            {
+                method:  'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization:  `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    nueva_habitacion_id: habSeleccionada.id,
+                    motivo:              motivoCambio.trim()
+                })
+            }
+        );
+        const data = await res.json();
+        if (!res.ok) {
+            setErrorCambio(data.error || 'Error al realizar el cambio');
+            return;
+        }
+        // Éxito
+        setExitoCambio({
+            origen:  data.habitacion_origen,
+            destino: data.habitacion_destino,
+            motivo:  motivoCambio.trim()
+        });
+        setMostrarCambio(false);
+        onUpdate?.();          // refresca el mapa/lista de habitaciones
+        // Cerramos el modal principal luego de 2 s para que el usuario vea el toast
+        setTimeout(() => onClose?.(), 2200);
+    } catch (err) {
+        setErrorCambio('Error de conexión al realizar el cambio');
+    } finally {
+        setGuardandoCambio(false);
+    }
+};
+
+const cerrarModalCambio = () => {
+    setMostrarCambio(false);
+    setErrorCambio('');
+    setHabSeleccionada(null);
+    setMotivoCambio('');
+};
+
     const agregarServicio = async () => {
         if (!formServicio.tipo_consumo_id || !habitacionReserva) return;
         try {
@@ -259,7 +376,8 @@ function ModalHabitacion({
                 ...formServicio,
                 cantidad,
                 precio_unitario: precioUnitario,
-                reserva_habitacion_id: habitacionReserva.id
+                reserva_habitacion_id: habitacionReserva.id,
+                estado: formServicioPagado ? 'cancelado' : 'pendiente'
             });
             setFormServicio({
                 tipo_consumo_id: '',
@@ -268,6 +386,7 @@ function ModalHabitacion({
                 precio_unitario: 0,
                 fecha: new Date().toISOString().split('T')[0]
             });
+            setFormServicioPagado(false);
             const resConsumos = await consumoService.getByReserva(reserva.id);
             setConsumos(resConsumos.data);
         } catch (err) {
@@ -290,7 +409,10 @@ function ModalHabitacion({
         return Math.round((salida - entrada) / (1000 * 60 * 60 * 24));
     };
 
-    const totalConsumos = consumos.reduce((sum, c) => sum + parseFloat(c.total || 0), 0);
+    const totalConsumos = consumos.reduce((sum, c) => {
+        const isPagado = c.estado === 'cancelado';
+        return sum + (isPagado ? 0 : parseFloat(c.total || 0));
+    }, 0);
     const totalReserva = toNumber(reserva?.total);
     const anticipo = toNumber(reserva?.anticipo);
     const totalFinal = Math.max(totalReserva + totalConsumos - anticipo, 0);
@@ -384,9 +506,17 @@ function ModalHabitacion({
             title={`Hab. ${habitacion.numero}`}
             subtitle={`${habitacion.tipo_nombre} - Piso ${habitacion.piso}`}
             headerActions={reserva && (
-                <button style={styles.btnCaja} onClick={irACaja}>
-                    Mandar a caja
-                </button>
+                <>
+                    <button style={styles.btnExtender} onClick={() => setMostrarExtender(true)}>
+                        + Dias
+                    </button>
+                    <button style={styles.btnCaja} onClick={irACaja}>
+                        Mandar a caja
+                    </button>
+                    <button style={styles.btnCambio} onClick={() => { setMostrarCambio(true); cargarHabitacionesCambio(); }}>
+                        🔄 Cambiar Hab.
+                    </button>
+                </>
             )}
         >
             {/* Pestañas */}
@@ -398,7 +528,7 @@ function ModalHabitacion({
                         color: pestana === p ? '#1a1a2e' : '#666',
                         fontWeight: pestana === p ? 'bold' : 'normal'
                     }} onClick={() => setPestana(p)}>
-                        {p === 'reserva' ? '📋 Reserva' : p === 'huesped' ? '👤 Huésped' : '🛎️ Servicios'}
+                        {p === 'reserva' ? '📋 Reserva' : p === 'huesped' ? '👤 Huésped' : '🛎️ Cargar Servicios'}
                     </button>
                 ))}
                 {reservasFuturas.length > 0 && (
@@ -530,7 +660,7 @@ function ModalHabitacion({
                             {pestana === 'servicios' && (
                                 <div>
                                     <div style={styles.formServicio}>
-                                        <h4 style={styles.seccionTitulo}>+ Agregar Servicio</h4>
+                                        <h4 style={styles.seccionTitulo}>+ Agregar servicio al total de la reserva</h4>
                                         <div style={styles.grid2}>
                                             <div>
                                                 <label style={styles.label}>Tipo de Servicio *</label>
@@ -571,6 +701,18 @@ function ModalHabitacion({
                                         <div style={{ marginTop: '10px' }}>
                                             <strong>Total: ${(formServicio.cantidad * formServicio.precio_unitario).toLocaleString()}</strong>
                                         </div>
+                                        <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <input
+                                                type="checkbox"
+                                                id="pagoAlMomento"
+                                                checked={formServicioPagado}
+                                                onChange={(e) => setFormServicioPagado(e.target.checked)}
+                                                style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                                            />
+                                            <label htmlFor="pagoAlMomento" style={{ cursor: 'pointer', color: '#333', fontSize: '13px' }}>
+                                                Marcar como pagado (se registrará como cancelado)
+                                            </label>
+                                        </div>
                                         <button style={styles.btnAgregar} onClick={agregarServicio}>
                                             Registrar Servicio
                                         </button>
@@ -588,24 +730,40 @@ function ModalHabitacion({
                                                     <th style={styles.th}>Cant.</th>
                                                     <th style={styles.th}>Precio</th>
                                                     <th style={styles.th}>Total</th>
+                                                    <th style={styles.th}>Estado</th>
                                                     <th style={styles.th}>Fecha</th>
                                                     <th style={styles.th}></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {consumos.map(c => (
-                                                    <tr key={c.id} style={styles.tr}>
-                                                        <td style={styles.td}>{c.tipo_nombre}</td>
-                                                        <td style={styles.td}>{c.descripcion || '-'}</td>
-                                                        <td style={styles.td}>{c.cantidad}</td>
-                                                        <td style={styles.td}>${parseFloat(c.precio_unitario).toLocaleString()}</td>
-                                                        <td style={styles.td}><strong>${parseFloat(c.total).toLocaleString()}</strong></td>
-                                                        <td style={styles.td}>{formatFecha(c.fecha)}</td>
-                                                        <td style={styles.td}>
-                                                            <button style={styles.btnEliminar} onClick={() => eliminarConsumo(c.id)}>✕</button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                {consumos.map(c => {
+                                                    const isPagado = c.estado === 'cancelado';
+                                                    return (
+                                                        <tr key={c.id} style={{...styles.tr, backgroundColor: isPagado ? '#f0f0f0' : 'transparent'}}>
+                                                            <td style={styles.td}>{c.tipo_nombre}</td>
+                                                            <td style={styles.td}>{c.descripcion || '-'}</td>
+                                                            <td style={styles.td}>{c.cantidad}</td>
+                                                            <td style={styles.td}>${parseFloat(c.precio_unitario).toLocaleString()}</td>
+                                                            <td style={styles.td}><strong>${parseFloat(c.total).toLocaleString()}</strong></td>
+                                                            <td style={styles.td}>
+                                                                <span style={{
+                                                                    padding: '2px 8px',
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '11px',
+                                                                    fontWeight: '600',
+                                                                    backgroundColor: isPagado ? '#2ecc71' : '#fff3cd',
+                                                                    color: isPagado ? 'white' : '#856404'
+                                                                }}>
+                                                                    {isPagado ? 'CANCELADO' : 'PENDIENTE'}
+                                                                </span>
+                                                            </td>
+                                                            <td style={styles.td}>{formatFecha(c.fecha)}</td>
+                                                            <td style={styles.td}>
+                                                                <button style={styles.btnEliminar} onClick={() => eliminarConsumo(c.id)}>✕</button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     )}
@@ -617,7 +775,213 @@ function ModalHabitacion({
                 </>
             )}
 
-            {/* MODAL MODAL PARA PRÓXIMAS LLEGADAS */}
+            {mostrarExtender && reserva && (
+                <div style={styles.overlay} onClick={() => setMostrarExtender(false)}>
+                    <div style={{ ...styles.modal, width: '400px' }} onClick={(e) => e.stopPropagation()}>
+                        <div style={styles.header}>
+                            <div>
+                                <h2 style={styles.titulo}>Extender estadia</h2>
+                                <span style={styles.subtitulo}>Hab. {habitacion.numero}</span>
+                            </div>
+                            <button style={styles.btnCerrar} onClick={() => setMostrarExtender(false)}>✕</button>
+                        </div>
+                        <div style={styles.contenido}>
+                            <div style={styles.formServicio}>
+                                <div style={styles.fila}>
+                                    <span style={styles.etiqueta}>Check-out actual</span>
+                                    <span style={styles.valor}>{formatFecha(reserva.fecha_salida)}</span>
+                                </div>
+                                <div style={styles.fila}>
+                                    <span style={styles.etiqueta}>Total actual</span>
+                                    <span style={styles.valor}>${parseFloat(reserva.total || 0).toLocaleString()}</span>
+                                </div>
+                                <div style={styles.fila}>
+                                    <span style={styles.etiqueta}>Precio por noche</span>
+                                    <span style={styles.valor}>${parseFloat(habitacionReserva?.precio_noche || 0).toLocaleString()}</span>
+                                </div>
+                            </div>
+
+                            <label style={styles.label}>Dias a agregar</label>
+                            <input
+                                style={{ ...styles.input, marginBottom: '12px' }}
+                                type="number"
+                                min="1"
+                                max="30"
+                                value={diasExtra}
+                                onChange={(e) => setDiasExtra(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                            />
+
+                            {diasExtra > 0 && habitacionReserva?.precio_noche && (
+                                <div style={styles.extensionPreview}>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Costo dias extra</span>
+                                        <span style={{ ...styles.valor, color: '#f39c12', fontWeight: 'bold' }}>
+                                            + ${(diasExtra * parseFloat(habitacionReserva.precio_noche)).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Nuevo total</span>
+                                        <span style={{ ...styles.valor, color: '#1a1a2e', fontWeight: 'bold' }}>
+                                            ${(parseFloat(reserva.total || 0) + diasExtra * parseFloat(habitacionReserva.precio_noche)).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Nuevo check-out</span>
+                                        <span style={{ ...styles.valor, color: '#2ecc71', fontWeight: 'bold' }}>
+                                            {formatFecha(
+                                                new Date(new Date(reserva.fecha_salida).getTime() + diasExtra * 86400000)
+                                                    .toISOString().split('T')[0]
+                                            )}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {errorExtension && (
+                                <p style={styles.errorExtension}>{errorExtension}</p>
+                            )}
+
+                            <div style={styles.extensionActions}>
+                                <button
+                                    style={styles.btnCancelarExtension}
+                                    onClick={() => {
+                                        setMostrarExtender(false);
+                                        setErrorExtension('');
+                                    }}
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    style={{ ...styles.btnAgregar, marginTop: 0, opacity: guardandoExtension ? 0.7 : 1 }}
+                                    onClick={extenderReserva}
+                                    disabled={guardandoExtension}
+                                >
+                                    {guardandoExtension ? 'Guardando...' : `Confirmar +${diasExtra} dia(s)`}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {mostrarCambio && reserva && (
+                <div style={styles.overlay} onClick={cerrarModalCambio}>
+                    <div style={{ ...styles.modal, width: '720px', maxHeight: '85vh' }} onClick={(e) => e.stopPropagation()}>
+                        <div style={styles.header}>
+                            <div>
+                                <h2 style={styles.titulo}>🔄 Cambiar Habitación</h2>
+                                <span style={styles.subtitulo}>Reserva #{reserva.id} · Hab. {habitacion.numero} → Mantenimiento</span>
+                            </div>
+                            <button style={styles.btnCerrar} onClick={cerrarModalCambio}>✕</button>
+                        </div>
+
+                        <div style={styles.contenido}>
+                            <div style={{ marginBottom: '12px' }}>
+                                <strong>📋 Cargos que se transferirán</strong>
+                                <div style={{ marginTop: '8px' }}>{clienteNombre}</div>
+
+                                <div style={styles.fila}>
+                                    <span style={styles.etiqueta}>Noches</span>
+                                    <span style={styles.valor}><strong>{calcularNoches()}</strong></span>
+                                </div>
+                                <div style={styles.fila}>
+                                    <span style={styles.etiqueta}>Personas</span>
+                                    <span style={styles.valor}><strong>{reserva.num_adultos} adulto(s) · {reserva.num_ninos} niño(s)</strong></span>
+                                </div>
+                                <div style={styles.fila}>
+                                    <span style={styles.etiqueta}>Check-in → Check-out</span>
+                                    <span style={styles.valor}><strong>{formatFecha(reserva.fecha_entrada)}</strong> → <strong>{formatFecha(reserva.fecha_salida)}</strong></span>
+                                </div>
+                                <div style={styles.fila}>
+                                    <span style={styles.etiqueta}>Total reserva</span>
+                                    <span style={styles.valor}><strong>${parseFloat(reserva.total || 0).toLocaleString()}</strong></span>
+                                </div>
+                                <div style={styles.fila}>
+                                    <span style={styles.etiqueta}>Consumos pendientes</span>
+                                    <span style={styles.valor}><strong>${totalConsumos.toLocaleString()}</strong></span>
+                                </div>
+                                <div style={styles.fila}>
+                                    <span style={styles.etiqueta}>Total final</span>
+                                    <span style={styles.valor}><strong>${totalFinal.toLocaleString()}</strong></span>
+                                </div>
+                            </div>
+
+                            <div style={{ marginBottom: '10px' }}>
+                                <label style={styles.label}>⚠️ Motivo del cambio *</label>
+                                <input
+                                    placeholder="Ej: Problema eléctrico, humedad, daño en baño..."
+                                    maxLength={300}
+                                    value={motivoCambio}
+                                    onChange={(e) => setMotivoCambio(e.target.value)}
+                                    style={styles.input}
+                                />
+                                <div style={{ fontSize: '12px', color: '#666', marginTop: '6px' }}>{motivoCambio.length}/300 · Se guardará en notas de mantenimiento y en la reserva</div>
+                            </div>
+
+                            <div style={{ marginBottom: '10px' }}>
+                                <label style={styles.label}>🏨 Seleccionar nueva habitación</label>
+
+                                {cargandoHabs ? (
+                                    <p style={{ color: '#666' }}>Cargando habitaciones disponibles...</p>
+                                ) : habitacionesCambio.length === 0 ? (
+                                    <p style={{ color: '#999' }}>No hay habitaciones disponibles para el cambio en este momento</p>
+                                ) : (
+                                    <div style={{ display: 'grid', gap: '8px' }}>
+                                        {habitacionesCambio.map((h) => {
+                                            const seleccionada = habSeleccionada?.id === h.id;
+                                            const esReservada  = h.motivo_disponible === 'reservada_sin_conflicto';
+                                            return (
+                                                <div key={h.id} style={{ ...styles.roomCard, borderColor: seleccionada ? '#2563eb' : '#e6e6e6' }} onClick={() => setHabSeleccionada(h)}>
+                                                    <div style={styles.roomRow}>
+                                                        <div style={{ fontWeight: '700' }}>Hab. {h.numero}</div>
+                                                        <div style={styles.roomStatus}>{esReservada ? '📅 Reservada (sin conflicto)' : '✅ Disponible'}</div>
+                                                    </div>
+                                                    <div style={styles.roomInfo}>
+                                                        <div>{h.tipo_nombre} · Piso {h.piso}</div>
+                                                        <div>{h.tipo_cama || 'Cama estándar'}</div>
+                                                        <div style={{ fontWeight: '700' }}>${parseFloat(h.precio_base || 0).toLocaleString()}/noche</div>
+                                                    </div>
+                                                    {esReservada && h.proxima_entrada && (
+                                                        <div style={{ marginTop: '6px', fontSize: '12px', color: '#666' }}>
+                                                            ⚡ Próxima reserva: {new Date(h.proxima_entrada).toLocaleDateString('es-CO', { timeZone: 'UTC' })} (después del checkout actual)
+                                                        </div>
+                                                    )}
+                                                    {seleccionada && <div style={styles.selectedBadge}>✓ Seleccionada</div>}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {habSeleccionada && habitacionReserva && (() => {
+                                const diff = parseFloat(habSeleccionada.precio_base || 0) - parseFloat(habitacionReserva.precio_noche || 0);
+                                if (diff === 0) return null;
+                                return (
+                                    <div style={{ marginBottom: '10px', color: '#333' }}>
+                                        {diff > 0 ? '⬆️' : '⬇️'} La nueva hab. tiene precio base <strong>{diff > 0 ? 'mayor' : 'menor'}</strong> en <strong>${Math.abs(diff).toLocaleString()}/noche</strong>. El total no se recalcula automáticamente; ajustalo desde Extender o Caja.
+                                    </div>
+                                );
+                            })()}
+
+                            {errorCambio && <p style={{ color: '#e74c3c' }}>⚠️ {errorCambio}</p>}
+
+                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '12px' }}>
+                                <button style={styles.btnCancelarExtension} onClick={cerrarModalCambio}>Cancelar</button>
+                                <button
+                                    style={{ ...styles.btnAgregar, opacity: guardandoCambio ? 0.7 : 1 }}
+                                    onClick={ejecutarCambio}
+                                    disabled={guardandoCambio || !habSeleccionada || !motivoCambio.trim()}
+                                >
+                                    {guardandoCambio ? 'Realizando cambio...' : `Confirmar cambio → Hab. ${habSeleccionada?.numero || '?'}`}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL PARA PRÓXIMAS LLEGADAS */}
             {mostrarProximas && (
                 <div style={styles.overlay} onClick={() => setMostrarProximas(false)}>
                     <div style={{ ...styles.modal, width: '800px' }} onClick={(event) => event.stopPropagation()}>
@@ -689,6 +1053,11 @@ function ModalHabitacion({
                     </div>
                 </div>
             )}
+            {exitoCambio && (
+                <div style={styles.toastExito}>
+                    ✅ Habitación cambiada: <strong>{exitoCambio.origen}</strong> → <strong>{exitoCambio.destino}</strong>. La hab. {exitoCambio.origen} pasó a Mantenimiento. Motivo: {exitoCambio.motivo}
+                </div>
+            )}
         </ModalBase>
     );
 }
@@ -700,6 +1069,7 @@ const styles = {
     headerActions: { display: 'flex', alignItems: 'center', gap: '10px' },
     titulo: { margin: 0, color: 'white', fontSize: '20px' },
     subtitulo: { color: '#aaa', fontSize: '13px' },
+    btnExtender: { backgroundColor: '#2563eb', border: 'none', color: 'white', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' },
     btnCaja: { backgroundColor: '#f39c12', border: 'none', color: 'white', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' },
     btnCerrar: { backgroundColor: 'transparent', border: '1px solid #666', color: 'white', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontSize: '16px' },
     footer: { padding: '0 25px 20px', display: 'flex', gap: '10px', flexWrap: 'wrap' },
@@ -726,6 +1096,17 @@ const styles = {
     td: { padding: '8px 10px', color: '#333' },
     btnEliminar: { backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '12px' },
     totalConsumos: { textAlign: 'right', marginTop: '10px', fontSize: '14px', color: '#333' },
+    extensionPreview: { backgroundColor: '#e8f5e9', borderRadius: '8px', padding: '12px', marginBottom: '12px' },
+    errorExtension: { color: '#e74c3c', fontSize: '13px', marginBottom: '10px' },
+    extensionActions: { display: 'flex', gap: '10px', justifyContent: 'flex-end' },
+    btnCancelarExtension: { backgroundColor: '#95a5a6', color: 'white', padding: '8px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer' },
+    btnCambio: { backgroundColor: '#6b7280', border: 'none', color: 'white', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' },
+    toastExito: { position: 'fixed', right: '18px', bottom: '18px', backgroundColor: '#2ecc71', color: 'white', padding: '12px 16px', borderRadius: '8px', boxShadow: '0 6px 18px rgba(0,0,0,0.2)', zIndex: 1100, maxWidth: '360px', fontSize: '14px' },
+    roomCard: { border: '1px solid #e6e6e6', borderRadius: '8px', padding: '10px', cursor: 'pointer', backgroundColor: 'white' },
+    roomRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
+    roomInfo: { display: 'flex', gap: '12px', fontSize: '13px', color: '#444', justifyContent: 'space-between' },
+    roomStatus: { fontSize: '13px', color: '#666' },
+    selectedBadge: { marginTop: '8px', display: 'inline-block', padding: '4px 8px', backgroundColor: '#2563eb', color: 'white', borderRadius: '6px', fontSize: '12px', fontWeight: '700' },
     
     // ESTILOS PARA PRÓXIMAS LLEGADAS MODAL
     listaProximas: { display: 'flex', flexDirection: 'column', gap: '12px' },

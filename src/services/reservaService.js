@@ -13,7 +13,8 @@ const reservaService = {
     getHabitaciones: (id) => api.get(`/reservas/${id}/habitaciones`),
     agregarHabitacion: (id, data) => api.post(`/reservas/${id}/habitaciones`, data),
     quitarHabitacion: (reserva_id, habitacion_id) => api.delete(`/reservas/${reserva_id}/habitaciones/${habitacion_id}`),
-    tieneFuturas: (habitacionId) => api.get(`/reservas/habitacion/${habitacionId}/futuras`)
+    tieneFuturas: (habitacionId) => api.get(`/reservas/habitacion/${habitacionId}/futuras`),
+    extender: (id, diasExtra) => api.patch(`/reservas/${id}/extender`, { dias_extra: diasExtra })
 };
 
 

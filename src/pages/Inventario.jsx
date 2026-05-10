@@ -46,6 +46,7 @@ function Inventario() {
         referencia: '',
         observacion: ''
     });
+    const [movHabitacionPagado, setMovHabitacionPagado] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -189,6 +190,7 @@ function Inventario() {
 
     const abrirMovimientoHabitacion = (producto = null) => {
         setProductoSeleccionadoHabitacion(producto);
+        setMovHabitacionPagado(false);
         setMovHabitacionData({
             producto_id: producto?.id || '',
             tipo_movimiento: 'salida',
@@ -228,11 +230,13 @@ function Inventario() {
                 cantidad,
                 precio_unitario: Number(producto?.precio_unitario) || 0,
                 fecha: new Date().toISOString().split('T')[0],
-                reserva_habitacion_id: reservaHabitacionId
+                reserva_habitacion_id: reservaHabitacionId,
+                estado: movHabitacionPagado ? 'cancelado' : 'pendiente'
             });
 
             setMostrarMovimientoHabitacion(false);
             setProductoSeleccionadoHabitacion(null);
+            setMovHabitacionPagado(false);
             setMovHabitacionData({
                 producto_id: '',
                 tipo_movimiento: 'salida',
@@ -490,6 +494,18 @@ function Inventario() {
                             value={movHabitacionData.observacion}
                             onChange={e => setMovHabitacionData({ ...movHabitacionData, observacion: e.target.value })}
                         />
+                    </div>
+                    <div className="form-grid__full" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+                        <input
+                            type="checkbox"
+                            id="pagoAlMomentoHabitacion"
+                            checked={movHabitacionPagado}
+                            onChange={(e) => setMovHabitacionPagado(e.target.checked)}
+                            style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                        />
+                        <label htmlFor="pagoAlMomentoHabitacion" style={{ cursor: 'pointer', color: '#333', fontSize: '13px', margin: 0 }}>
+                            Marcar como pagado (se registrará como cancelado)
+                        </label>
                     </div>
                 </div>
             </ModalHabitacion>
