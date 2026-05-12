@@ -79,6 +79,11 @@ function ModalHabitacion({
     const [diasExtra, setDiasExtra] = useState(1);
     const [guardandoExtension, setGuardandoExtension] = useState(false);
     const [errorExtension, setErrorExtension] = useState('');
+    const [editandoHuespedes, setEditandoHuespedes] = useState(false);
+    const [numAdultos, setNumAdultos] = useState(0);
+    const [numNinos, setNumNinos] = useState(0);
+    const [guardandoHuespedes, setGuardandoHuespedes] = useState(false);
+    const [errorHuespedes, setErrorHuespedes] = useState('');
     const [loading, setLoading] = useState(true);
     const [formServicio, setFormServicio] = useState({
         tipo_consumo_id: '',
@@ -211,6 +216,8 @@ function ModalHabitacion({
             if (reservaEncontrada) {
                 setReserva(reservaEncontrada);
                 setHabitacionReserva(habitacionReservaEncontrada);
+                setNumAdultos(reservaEncontrada.num_adultos || 1);
+                setNumNinos(reservaEncontrada.num_ninos || 0);
                 await resolveClienteYEmpleado(reservaEncontrada);
                 const resConsumos = await consumoService.getByReserva(reservaEncontrada.id);
                 setConsumos(resConsumos.data);
@@ -288,6 +295,39 @@ function ModalHabitacion({
             setErrorExtension(msg);
         } finally {
             setGuardandoExtension(false);
+        }
+    };
+
+    const guardarHuespedes = async () => {
+        if (!reserva?.id) return;
+        setGuardandoHuespedes(true);
+        setErrorHuespedes('');
+        try {
+            const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const token = localStorage.getItem('token') || '';
+            const res = await fetch(`${BASE_URL}/reservas/${reserva.id}/personas`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    num_adultos: numAdultos,
+                    num_ninos: numNinos
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setErrorHuespedes(data.error || 'No se pudo actualizar');
+                return;
+            }
+            setReserva(prev => ({ ...prev, num_adultos: numAdultos, num_ninos: numNinos }));
+            setEditandoHuespedes(false);
+            onUpdate?.();
+        } catch (err) {
+            setErrorHuespedes('Error de conexión');
+        } finally {
+            setGuardandoHuespedes(false);
         }
     };
 
@@ -652,6 +692,96 @@ const cerrarModalCambio = () => {
                                                 <span style={styles.valor}>{empleadoNombre || '-'}</span>
                                             </div>
                                         </div>
+                                    </div>
+
+                                    {/* ── SECCIÓN PERSONAS ── */}
+                                    <div style={{ marginTop: '18px', backgroundColor: '#f9f9f9', borderRadius: '8px', padding: '14px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                            <h4 style={{ margin: 0, color: '#1a1a2e', fontSize: '14px' }}>👥 Personas en la habitación</h4>
+                                            {!editandoHuespedes && (
+                                                <button
+                                                    style={{ ...styles.btnCambio, fontSize: '12px', padding: '5px 12px' }}
+                                                    onClick={() => setEditandoHuespedes(true)}
+                                                >
+                                                    ✏️ Editar
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {!editandoHuespedes ? (
+                                            <div style={styles.grid2}>
+                                                <div style={styles.fila}>
+                                                    <span style={styles.etiqueta}>Adultos</span>
+                                                    <span style={{ ...styles.valor, fontWeight: 'bold', fontSize: '16px' }}>{reserva.num_adultos}</span>
+                                                </div>
+                                                <div style={styles.fila}>
+                                                    <span style={styles.etiqueta}>Niños</span>
+                                                    <span style={{ ...styles.valor, fontWeight: 'bold', fontSize: '16px' }}>{reserva.num_ninos}</span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div style={styles.grid2}>
+                                                    <div>
+                                                        <label style={styles.label}>Adultos</label>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                            <button
+                                                                style={styles.btnContador}
+                                                                onClick={() => setNumAdultos(Math.max(1, numAdultos - 1))}
+                                                            >−</button>
+                                                            <span style={{ fontSize: '20px', fontWeight: 'bold', minWidth: '28px', textAlign: 'center' }}>
+                                                                {numAdultos}
+                                                            </span>
+                                                            <button
+                                                                style={styles.btnContador}
+                                                                onClick={() => setNumAdultos(numAdultos + 1)}
+                                                            >+</button>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label style={styles.label}>Niños</label>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                            <button
+                                                                style={styles.btnContador}
+                                                                onClick={() => setNumNinos(Math.max(0, numNinos - 1))}
+                                                            >−</button>
+                                                            <span style={{ fontSize: '20px', fontWeight: 'bold', minWidth: '28px', textAlign: 'center' }}>
+                                                                {numNinos}
+                                                            </span>
+                                                            <button
+                                                                style={styles.btnContador}
+                                                                onClick={() => setNumNinos(numNinos + 1)}
+                                                            >+</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {errorHuespedes && (
+                                                    <p style={{ color: '#e74c3c', fontSize: '13px', margin: '10px 0 0' }}>⚠️ {errorHuespedes}</p>
+                                                )}
+
+                                                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '14px' }}>
+                                                    <button
+                                                        style={styles.btnCancelarExtension}
+                                                        onClick={() => {
+                                                            setEditandoHuespedes(false);
+                                                            setNumAdultos(reserva.num_adultos);
+                                                            setNumNinos(reserva.num_ninos);
+                                                            setErrorHuespedes('');
+                                                        }}
+                                                    >
+                                                        Cancelar
+                                                    </button>
+                                                    <button
+                                                        style={{ ...styles.btnAgregar, marginTop: 0, opacity: guardandoHuespedes ? 0.7 : 1 }}
+                                                        onClick={guardarHuespedes}
+                                                        disabled={guardandoHuespedes}
+                                                    >
+                                                        {guardandoHuespedes ? 'Guardando...' : '💾 Guardar cambios'}
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -1101,6 +1231,7 @@ const styles = {
     extensionActions: { display: 'flex', gap: '10px', justifyContent: 'flex-end' },
     btnCancelarExtension: { backgroundColor: '#95a5a6', color: 'white', padding: '8px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer' },
     btnCambio: { backgroundColor: '#6b7280', border: 'none', color: 'white', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' },
+    btnContador: { width: '32px', height: '32px', borderRadius: '6px', border: '1px solid #ddd', backgroundColor: 'white', fontSize: '18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' },
     toastExito: { position: 'fixed', right: '18px', bottom: '18px', backgroundColor: '#2ecc71', color: 'white', padding: '12px 16px', borderRadius: '8px', boxShadow: '0 6px 18px rgba(0,0,0,0.2)', zIndex: 1100, maxWidth: '360px', fontSize: '14px' },
     roomCard: { border: '1px solid #e6e6e6', borderRadius: '8px', padding: '10px', cursor: 'pointer', backgroundColor: 'white' },
     roomRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
