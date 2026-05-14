@@ -6,6 +6,24 @@ import clienteService from '../services/clienteService';
 import empleadoService from '../services/empleadoService';
 import habitacionService from '../services/habitacionService';
 
+// Cache simple en memoria
+const cache = {};
+const CACHE_TTL = 60000; // 60 segundos
+
+const getCached = (key) => {
+    const entry = cache[key];
+    if (!entry) return null;
+    if (Date.now() - entry.time > CACHE_TTL) {
+        delete cache[key];
+        return null;
+    }
+    return entry.data;
+};
+
+const setCached = (key, data) => {
+    cache[key] = { data, time: Date.now() };
+};
+
 function ModalBase({ open, onClose, width = '750px', title, subtitle, headerActions, children, footer }) {
     useEffect(() => {
         if (!open) return undefined;
@@ -186,91 +204,128 @@ function ModalHabitacion({
     };
 
     const cargarDatos = async () => {
-        try {
-            setLoading(true);
-            setClienteDetalle(null);
-            setEmpleadoNombre('');
-            setReservasFuturas([]);
-            setReserva(null); // Limpiar reserva anterior
-            
-            // 1. Obtener reservas en checkin (normalizar array)
-            const resReservas = await reservaService.getByEstado('checkin');
-            const reservasCheckin = Array.isArray(resReservas.data) ? resReservas.data : (resReservas.data?.data || []);
-            
-            let reservaEncontrada = null;
-            let habitacionReservaEncontrada = null;
-
-            if (Array.isArray(reservasCheckin) && reservasCheckin.length > 0) {
-                for (const r of reservasCheckin) {
-                    const resHabs = await reservaService.getHabitaciones(r.id);
-                    const habsArray = Array.isArray(resHabs.data) ? resHabs.data : (resHabs.data?.data || []);
-                    const habEnReserva = habsArray.find(h => h.habitacion_id === habitacion.id);
-                    if (habEnReserva) {
-                        reservaEncontrada = r;
-                        habitacionReservaEncontrada = habEnReserva;
-                        break;
-                    }
-                }
-            }
-
-            if (reservaEncontrada) {
-                setReserva(reservaEncontrada);
-                setHabitacionReserva(habitacionReservaEncontrada);
-                setNumAdultos(reservaEncontrada.num_adultos || 1);
-                setNumNinos(reservaEncontrada.num_ninos || 0);
-                await resolveClienteYEmpleado(reservaEncontrada);
-                const resConsumos = await consumoService.getByReserva(reservaEncontrada.id);
-                setConsumos(resConsumos.data);
-            }
-
-            // 3. Cargar TODAS las reservas (futuras) para esta habitación
-            try {
-                const todasReservas = await reservaService.getAll();
-                const payload = Array.isArray(todasReservas.data) ? todasReservas.data : todasReservas.data?.data || [];
-                
-                const hoy = new Date();
-                hoy.setHours(0, 0, 0, 0);
-                
-                const futuras = [];
-                for (const r of payload) {
-                    // Obtener habitaciones de la reserva (normalizar)
-                    try {
-                        const resHabs = await reservaService.getHabitaciones(r.id);
-                        const habsArray = Array.isArray(resHabs.data) ? resHabs.data : (resHabs.data?.data || []);
-                        const habEnReserva = habsArray.find(h => h.habitacion_id === habitacion.id);
-                        
-                        if (habEnReserva) {
-                            const fechaEntrada = new Date(r.fecha_entrada);
-                            fechaEntrada.setHours(0, 0, 0, 0);
-                            
-                            // Solo mostrar reservas futuras y que no estén canceladas (y no sean la actual)
-                            const esActual = reservaEncontrada && r.id === reservaEncontrada.id;
-                            if (fechaEntrada >= hoy && r.estado !== 'cancelada' && !esActual) {
-                                futuras.push({ ...r, habitacion_detalle: habEnReserva });
-                            }
-                        }
-                    } catch (err) {
-                        console.warn('Error cargando habitaciones de reserva', err);
-                    }
-                }
-                
-                // Ordenar por fecha
-                futuras.sort((a, b) => new Date(a.fecha_entrada) - new Date(b.fecha_entrada));
-                setReservasFuturas(futuras);
-            } catch (err) {
-                console.warn('Error cargando reservas futuras', err);
-            }
-
-            const resTipos = await consumoService.getTipos();
-            setTiposConsumo(resTipos.data);
-        } catch (err) {
-            console.error('Error cargando datos', err);
-            setReserva(null);
-            setReservasFuturas([]);
-        } finally {
-            setLoading(false);
+    const cacheKey = `habitacion_${habitacion.id}`;
+    const cached = getCached(cacheKey);
+    
+    if (cached) {
+        setReserva(cached.reserva);
+        setHabitacionReserva(cached.habitacionReserva);
+        setClienteDetalle(cached.clienteDetalle);
+        setEmpleadoNombre(cached.empleadoNombre);
+        setConsumos(cached.consumos);
+        setTiposConsumo(cached.tiposConsumo);
+        setReservasFuturas(cached.reservasFuturas);
+        if (cached.reserva) {
+            setNumAdultos(cached.reserva.num_adultos || 1);
+            setNumNinos(cached.reserva.num_ninos || 0);
         }
-    };
+        setLoading(false);
+        return;
+    }
+
+    try {
+        setLoading(true);
+        setClienteDetalle(null);
+        setEmpleadoNombre('');
+        setReservasFuturas([]);
+        setReserva(null);
+
+        const resReservas = await reservaService.getByEstado('checkin');
+        const reservasCheckin = Array.isArray(resReservas.data) ? resReservas.data : (resReservas.data?.data || []);
+
+        let reservaEncontrada = null;
+        let habitacionReservaEncontrada = null;
+
+        if (Array.isArray(reservasCheckin) && reservasCheckin.length > 0) {
+            for (const r of reservasCheckin) {
+                const resHabs = await reservaService.getHabitaciones(r.id);
+                const habsArray = Array.isArray(resHabs.data) ? resHabs.data : (resHabs.data?.data || []);
+                const habEnReserva = habsArray.find(h => h.habitacion_id === habitacion.id);
+                if (habEnReserva) {
+                    reservaEncontrada = r;
+                    habitacionReservaEncontrada = habEnReserva;
+                    break;
+                }
+            }
+        }
+
+        let clienteDetalleData = null;
+        let empleadoNombreData = '';
+
+       if (reservaEncontrada) {
+        setReserva(reservaEncontrada);
+        setHabitacionReserva(habitacionReservaEncontrada);
+        setNumAdultos(reservaEncontrada.num_adultos || 1);
+        setNumNinos(reservaEncontrada.num_ninos || 0);
+        await resolveClienteYEmpleado(reservaEncontrada);
+        const resConsumos = await consumoService.getByReserva(reservaEncontrada.id);
+        setConsumos(resConsumos.data);
+        // Capturar valores actuales del estado para el caché
+        clienteDetalleData = null; // se llenará abajo
+        empleadoNombreData = '';   // se llenará abajo
+}
+
+        const futuras = [];
+        try {
+            const todasReservas = await reservaService.getAll();
+            const payload = Array.isArray(todasReservas.data) ? todasReservas.data : todasReservas.data?.data || [];
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+
+            // Peticiones en paralelo en vez de secuencial
+            const resultados = await Promise.allSettled(
+                payload.map(r => reservaService.getHabitaciones(r.id).then(res => ({ r, res })))
+            );
+
+            for (const resultado of resultados) {
+                if (resultado.status !== 'fulfilled') continue;
+                const { r, res } = resultado.value;
+                const habsArray = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+                const habEnReserva = habsArray.find(h => h.habitacion_id === habitacion.id);
+                if (habEnReserva) {
+                    const fechaEntrada = new Date(r.fecha_entrada);
+                    fechaEntrada.setHours(0, 0, 0, 0);
+                    const esActual = reservaEncontrada && r.id === reservaEncontrada.id;
+                    if (fechaEntrada >= hoy && r.estado !== 'cancelada' && !esActual) {
+                        futuras.push({ ...r, habitacion_detalle: habEnReserva });
+                    }
+                }
+            }
+            futuras.sort((a, b) => new Date(a.fecha_entrada) - new Date(b.fecha_entrada));
+            setReservasFuturas(futuras);
+        } catch (err) {
+            console.warn('Error cargando reservas futuras', err);
+        }
+
+
+        // Guardar en caché
+        const resTipos = await consumoService.getTipos();
+        setTiposConsumo(resTipos.data);
+
+        // Capturar cliente para el caché
+        const clienteActual = await clienteService.getById(
+            reservaEncontrada?.cliente_id
+        ).then(r => r.data?.data || r.data || null).catch(() => null);
+
+        // Guardar en caché
+        setCached(cacheKey, {
+            reserva: reservaEncontrada,
+            habitacionReserva: habitacionReservaEncontrada,
+            clienteDetalle: clienteActual,
+            empleadoNombre: '',
+            consumos: reservaEncontrada ? (await consumoService.getByReserva(reservaEncontrada.id)).data : [],
+            tiposConsumo: resTipos.data,
+            reservasFuturas: futuras
+        });
+
+    } catch (err) {
+        console.error('Error cargando datos', err);
+        setReserva(null);
+        setReservasFuturas([]);
+    } finally {
+        setLoading(false);
+    }
+};
 
     const extenderReserva = async () => {
         if (!reserva?.id || diasExtra < 1) return;
