@@ -5,6 +5,9 @@ import consumoService from '../services/consumoService';
 import clienteService from '../services/clienteService';
 import empleadoService from '../services/empleadoService';
 import habitacionService from '../services/habitacionService';
+// usar HOOk personalizado para verificar si la reserva tiene pagos registrados
+import useReservaPagada from '../hooks/useReservaPagada';
+import ReservaPagadaBadge from './ui/ReservaPagadaBadge';
 
 // Cache simple en memoria
 const cache = {};
@@ -103,6 +106,7 @@ function ModalHabitacion({
     const [guardandoHuespedes, setGuardandoHuespedes] = useState(false);
     const [errorHuespedes, setErrorHuespedes] = useState('');
     const [loading, setLoading] = useState(true);
+    
     const [formServicio, setFormServicio] = useState({
         tipo_consumo_id: '',
         descripcion: '',
