@@ -707,15 +707,6 @@ function ModalHabitacion({
                                     <strong>Observaciones:</strong> {reserva.observaciones}
                                 </div>
                             )}
-
-                            {/* Botón ir a caja dentro del panel — solo si no pagada */}
-                            {!loadingPago && !reservaPagada && (
-                                <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'flex-end' }}>
-                                    <button style={styles.btnCaja} onClick={irACaja}>
-                                        💳 Ir a Caja
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     )}
 
