@@ -230,26 +230,47 @@ function Reservas() {
     };
 
     const validarFormulario = () => {
-        if (!form.clienteId || !form.habitacionId || !form.checkIn || !form.checkOut) {
-            setError('Cliente, Habitacion, Check-in y Check-out son obligatorios.');
-            return false;
-        }
-        if (valoresCalculados.noches <= 0) {
-            setError('La fecha de Check-out debe ser posterior al Check-in.');
-            return false;
-        }
-        if (habitacionesNoDisponibles.has(Number(form.habitacionId))) {
-            setError('La habitación seleccionada no se puede reservar por cruce de fechas.');
-            return false;
-        }
-        const habitacionSeleccionada = habitaciones.find((h) => String(h.id) === String(form.habitacionId));
-        const estadoHabitacion = normalizarEstado(habitacionSeleccionada?.estado);
-        if (estadoHabitacion === 'mantenimiento' || estadoHabitacion === 'bloqueada') {
-            setError('No se puede reservar habitaciones en mantenimiento o bloqueadas.');
-            return false;
-        }
-        return true;
-    };
+    if (!form.clienteId || !form.habitacionId || !form.checkIn || !form.checkOut) {
+        setError('Cliente, Habitacion, Check-in y Check-out son obligatorios.');
+        return false;
+    }
+    if (valoresCalculados.noches <= 0) {
+        setError('La fecha de Check-out debe ser posterior al Check-in.');
+        return false;
+    }
+    if (habitacionesNoDisponibles.has(Number(form.habitacionId))) {
+        setError('La habitación seleccionada no se puede reservar por cruce de fechas.');
+        return false;
+    }
+
+    // ── NUEVO: bloquear si hay checkin activo vencido en esa habitación ──
+    const checkinVencido = reservas.some((r) => {
+        const estado = fromApiEstado(r?.estado);
+        if (estado !== 'check-in') return false;
+
+        const habId = getHabitacionIdFromReserva(r);
+        if (String(habId) !== String(form.habitacionId)) return false;
+
+        const fechaSalida = toDateSafe(getFechaSalidaReserva(r));
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        return fechaSalida && fechaSalida < hoy;
+    });
+
+    if (checkinVencido) {
+        setError('Esta habitación tiene un huésped con estadía vencida. Completa el Check-Out desde la pantalla CheckOut antes de crear una nueva reserva.');
+        return false;
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
+    const habitacionSeleccionada = habitaciones.find((h) => String(h.id) === String(form.habitacionId));
+    const estadoHabitacion = normalizarEstado(habitacionSeleccionada?.estado);
+    if (estadoHabitacion === 'mantenimiento' || estadoHabitacion === 'bloqueada') {
+        setError('No se puede reservar habitaciones en mantenimiento o bloqueadas.');
+        return false;
+    }
+    return true;
+};
 
     const crearReserva = async (e) => {
         e.preventDefault();
