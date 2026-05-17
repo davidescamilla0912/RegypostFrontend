@@ -339,7 +339,7 @@ function ModalHabitacion({
         setGuardandoHuespedes(true);
         setErrorHuespedes('');
         try {
-            const BASE_URL = import.meta?.env?.VITE_API_URL || 'http://localhost:5000';
+            const BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
             const token = localStorage.getItem('token') || '';
             const res = await fetch(`${BASE_URL}/reservas/${reserva.id}/personas`, {
                 method: 'PATCH',
@@ -365,7 +365,7 @@ function ModalHabitacion({
         setErrorCambio('');
         setHabSeleccionada(null);
         try {
-            const BASE_URL = import.meta?.env?.VITE_API_URL || 'http://localhost:5000';
+            const BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
             const token = localStorage.getItem('token') || '';
             const res = await fetch(
                 `${BASE_URL}/reservas/${reserva.id}/habitaciones-para-cambio`,
@@ -388,7 +388,7 @@ function ModalHabitacion({
         setGuardandoCambio(true);
         setErrorCambio('');
         try {
-            const BASE_URL = import.meta?.env?.VITE_API_URL || 'http://localhost:5000';
+            const BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
             const token = localStorage.getItem('token') || '';
             const res = await fetch(`${BASE_URL}/reservas/${reserva.id}/cambiar-habitacion`, {
                 method: 'POST',
