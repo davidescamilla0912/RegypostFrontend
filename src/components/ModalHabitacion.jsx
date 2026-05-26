@@ -90,6 +90,7 @@ function ModalHabitacion({
     const [guardandoCambio, setGuardandoCambio] = useState(false);
     const [exitoCambio, setExitoCambio] = useState(null);
     const [diasExtra, setDiasExtra] = useState(1);
+    const [precioNocheExtension, setPrecioNocheExtension] = useState(0);
     const [guardandoExtension, setGuardandoExtension] = useState(false);
     const [errorExtension, setErrorExtension] = useState('');
     const [editandoHuespedes, setEditandoHuespedes] = useState(false);
@@ -309,13 +310,45 @@ function ModalHabitacion({
         }
     };
 
+    // ── Abrir modal extender (inicializa precio editable con el valor actual) ──
+    const abrirExtender = () => {
+        setPrecioNocheExtension(parseFloat(habitacionReserva?.precio_noche || 0));
+        setDiasExtra(1);
+        setErrorExtension('');
+        setMostrarExtender(true);
+    };
+
+    // ── Cerrar modal extender ──────────────────────────────────────────────────
+    const cerrarExtender = () => {
+        setMostrarExtender(false);
+        setErrorExtension('');
+        setDiasExtra(1);
+        setPrecioNocheExtension(0);
+    };
+
+    // ── Cálculos reactivos del preview de extensión ────────────────────────────
+    const costoExtension = diasExtra * precioNocheExtension;
+    const nuevoTotal = parseFloat(reserva?.total || 0) + costoExtension;
+    const nuevaFechaSalida = reserva?.fecha_salida
+        ? new Date(new Date(reserva.fecha_salida).getTime() + diasExtra * 86400000)
+            .toISOString().split('T')[0]
+        : null;
+
     // ── Extender reserva ───────────────────────────────────────────────────────
     const extenderReserva = async () => {
         if (!reserva?.id || diasExtra < 1) return;
+        if (precioNocheExtension <= 0) {
+            setErrorExtension('El precio por noche debe ser mayor a $0.');
+            return;
+        }
         setErrorExtension('');
         setGuardandoExtension(true);
         try {
-            const res = await reservaService.extender(reserva.id, Number(diasExtra));
+            const res = await reservaService.extender(
+                reserva.id,
+                Number(diasExtra),
+                precioNocheExtension   // <-- enviamos el precio personalizado
+            );
             const datos = res.data;
             setReserva(prev => ({
                 ...prev,
@@ -323,8 +356,7 @@ function ModalHabitacion({
                 total: datos.nuevo_total,
                 saldo_pendiente: datos.nuevo_saldo
             }));
-            setMostrarExtender(false);
-            setDiasExtra(1);
+            cerrarExtender();
             onUpdate?.();
         } catch (err) {
             setErrorExtension(err?.response?.data?.error || 'No se pudo extender la reserva');
@@ -438,7 +470,6 @@ function ModalHabitacion({
             setFormServicioPagado(false);
             const resConsumos = await consumoService.getByReserva(reserva.id);
             setConsumos(resConsumos.data);
-            // Recargar estado de pago si cambian los consumos
             recargarPago();
         } catch (err) {
             console.error('Error agregando servicio', err);
@@ -554,10 +585,9 @@ function ModalHabitacion({
             subtitle={`${habitacion.tipo_nombre} - Piso ${habitacion.piso}`}
             headerActions={reserva && (
                 <>
-                    <button style={styles.btnExtender} onClick={() => setMostrarExtender(true)}>
+                    <button style={styles.btnExtender} onClick={abrirExtender}>
                         + Dias
                     </button>
-                    {/* Solo mostrar "Mandar a caja" si NO está pagada */}
                     {!loadingPago && !reservaPagada && (
                         <button style={styles.btnCaja} onClick={irACaja}>
                             Mandar a caja
@@ -607,7 +637,6 @@ function ModalHabitacion({
                     {/* ── PESTAÑA RESERVA ── */}
                     {pestana === 'reserva' && (
                         <div>
-                            {/* Banner de estado de pago */}
                             {!loadingPago && (
                                 <div style={{
                                     marginBottom: '14px',
@@ -633,69 +662,32 @@ function ModalHabitacion({
                             )}
 
                             <div style={styles.grid2}>
-                                {/* Fechas */}
                                 <div style={styles.seccion}>
                                     <h4 style={styles.seccionTitulo}>📅 Fechas</h4>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Check-in</span>
-                                        <span style={styles.valor}>{formatFecha(reserva.fecha_entrada)}</span>
-                                    </div>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Check-out</span>
-                                        <span style={styles.valor}>{formatFecha(reserva.fecha_salida)}</span>
-                                    </div>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Noches</span>
-                                        <span style={styles.valor}>{calcularNoches()}</span>
-                                    </div>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Adultos</span>
-                                        <span style={styles.valor}>{reserva.num_adultos}</span>
-                                    </div>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Niños</span>
-                                        <span style={styles.valor}>{reserva.num_ninos}</span>
-                                    </div>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Fuente</span>
-                                        <span style={styles.valor}>{reserva.fuente}</span>
-                                    </div>
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Check-in</span><span style={styles.valor}>{formatFecha(reserva.fecha_entrada)}</span></div>
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Check-out</span><span style={styles.valor}>{formatFecha(reserva.fecha_salida)}</span></div>
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Noches</span><span style={styles.valor}>{calcularNoches()}</span></div>
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Adultos</span><span style={styles.valor}>{reserva.num_adultos}</span></div>
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Niños</span><span style={styles.valor}>{reserva.num_ninos}</span></div>
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Fuente</span><span style={styles.valor}>{reserva.fuente}</span></div>
                                 </div>
 
-                                {/* Financiero */}
                                 <div style={styles.seccion}>
                                     <h4 style={styles.seccionTitulo}>💰 Financiero</h4>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Precio/noche</span>
-                                        <span style={styles.valor}>{toCurrency(habitacionReserva?.precio_noche)}</span>
-                                    </div>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Total reserva</span>
-                                        <span style={styles.valor}>{toCurrency(totalReserva)}</span>
-                                    </div>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Anticipo</span>
-                                        <span style={{ ...styles.valor, color: '#2ecc71' }}>{toCurrency(anticipo)}</span>
-                                    </div>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Consumos</span>
-                                        <span style={{ ...styles.valor, color: '#f39c12' }}>{toCurrency(totalConsumos)}</span>
-                                    </div>
-                                    {/* Fila dinámica: muestra estado según pago */}
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Precio/noche</span><span style={styles.valor}>{toCurrency(habitacionReserva?.precio_noche)}</span></div>
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Total reserva</span><span style={styles.valor}>{toCurrency(totalReserva)}</span></div>
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Anticipo</span><span style={{ ...styles.valor, color: '#2ecc71' }}>{toCurrency(anticipo)}</span></div>
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Consumos</span><span style={{ ...styles.valor, color: '#f39c12' }}>{toCurrency(totalConsumos)}</span></div>
                                     {!loadingPago && (
                                         reservaPagada ? (
                                             <div style={{ ...styles.fila, marginTop: '6px' }}>
                                                 <span style={styles.etiqueta}>Estado</span>
-                                                <span style={{ ...styles.valor, color: '#27ae60', fontWeight: 'bold' }}>
-                                                    ✓ PAGADO
-                                                </span>
+                                                <span style={{ ...styles.valor, color: '#27ae60', fontWeight: 'bold' }}>✓ PAGADO</span>
                                             </div>
                                         ) : (
                                             <div style={styles.fila}>
                                                 <span style={styles.etiqueta}>Total final</span>
-                                                <span style={{ ...styles.valor, color: '#e74c3c', fontWeight: 'bold' }}>
-                                                    {toCurrency(totalFinal)}
-                                                </span>
+                                                <span style={{ ...styles.valor, color: '#e74c3c', fontWeight: 'bold' }}>{toCurrency(totalFinal)}</span>
                                             </div>
                                         )
                                     )}
@@ -716,38 +708,17 @@ function ModalHabitacion({
                             <h4 style={styles.seccionTitulo}>👤 Titular de la Reserva</h4>
                             <div style={styles.grid2}>
                                 <div>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Nombre</span>
-                                        <span style={{ ...styles.valor, fontWeight: 'bold', fontSize: '16px' }}>{clienteNombre}</span>
-                                    </div>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Documento</span>
-                                        <span style={styles.valor}>{clienteDocumento}</span>
-                                    </div>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Teléfono</span>
-                                        <span style={styles.valor}>{reserva.telefono || clienteDetalle?.telefono || '-'}</span>
-                                    </div>
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Nombre</span><span style={{ ...styles.valor, fontWeight: 'bold', fontSize: '16px' }}>{clienteNombre}</span></div>
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Documento</span><span style={styles.valor}>{clienteDocumento}</span></div>
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Teléfono</span><span style={styles.valor}>{reserva.telefono || clienteDetalle?.telefono || '-'}</span></div>
                                 </div>
                                 <div>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Reserva ID</span>
-                                        <span style={styles.valor}>#{reserva.id}</span>
-                                    </div>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Estado</span>
-                                        <span style={{ ...styles.valor, color: '#2ecc71', fontWeight: 'bold' }}>
-                                            {reserva.estado?.toUpperCase()}
-                                        </span>
-                                    </div>
-                                    <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Empleado</span>
-                                        <span style={styles.valor}>{empleadoNombre || '-'}</span>
-                                    </div>
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Reserva ID</span><span style={styles.valor}>#{reserva.id}</span></div>
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Estado</span><span style={{ ...styles.valor, color: '#2ecc71', fontWeight: 'bold' }}>{reserva.estado?.toUpperCase()}</span></div>
+                                    <div style={styles.fila}><span style={styles.etiqueta}>Empleado</span><span style={styles.valor}>{empleadoNombre || '-'}</span></div>
                                 </div>
                             </div>
 
-                            {/* Personas */}
                             <div style={{ marginTop: '18px', backgroundColor: '#f9f9f9', borderRadius: '8px', padding: '14px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                                     <h4 style={{ margin: 0, color: '#1a1a2e', fontSize: '14px' }}>👥 Personas en la habitación</h4>
@@ -761,14 +732,8 @@ function ModalHabitacion({
 
                                 {!editandoHuespedes ? (
                                     <div style={styles.grid2}>
-                                        <div style={styles.fila}>
-                                            <span style={styles.etiqueta}>Adultos</span>
-                                            <span style={{ ...styles.valor, fontWeight: 'bold', fontSize: '16px' }}>{reserva.num_adultos}</span>
-                                        </div>
-                                        <div style={styles.fila}>
-                                            <span style={styles.etiqueta}>Niños</span>
-                                            <span style={{ ...styles.valor, fontWeight: 'bold', fontSize: '16px' }}>{reserva.num_ninos}</span>
-                                        </div>
+                                        <div style={styles.fila}><span style={styles.etiqueta}>Adultos</span><span style={{ ...styles.valor, fontWeight: 'bold', fontSize: '16px' }}>{reserva.num_adultos}</span></div>
+                                        <div style={styles.fila}><span style={styles.etiqueta}>Niños</span><span style={{ ...styles.valor, fontWeight: 'bold', fontSize: '16px' }}>{reserva.num_ninos}</span></div>
                                     </div>
                                 ) : (
                                     <>
@@ -790,9 +755,7 @@ function ModalHabitacion({
                                                 </div>
                                             </div>
                                         </div>
-                                        {errorHuespedes && (
-                                            <p style={{ color: '#e74c3c', fontSize: '13px', margin: '10px 0 0' }}>⚠️ {errorHuespedes}</p>
-                                        )}
+                                        {errorHuespedes && <p style={{ color: '#e74c3c', fontSize: '13px', margin: '10px 0 0' }}>⚠️ {errorHuespedes}</p>}
                                         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '14px' }}>
                                             <button style={styles.btnCancelarExtension}
                                                 onClick={() => { setEditandoHuespedes(false); setNumAdultos(reserva.num_adultos); setNumNinos(reserva.num_ninos); setErrorHuespedes(''); }}>
@@ -923,47 +886,114 @@ function ModalHabitacion({
 
             {/* ── Modal extender ── */}
             {mostrarExtender && reserva && (
-                <div style={styles.overlay} onClick={() => setMostrarExtender(false)}>
-                    <div style={{ ...styles.modal, width: '400px' }} onClick={e => e.stopPropagation()}>
+                <div style={styles.overlay} onClick={cerrarExtender}>
+                    <div style={{ ...styles.modal, width: '420px' }} onClick={e => e.stopPropagation()}>
                         <div style={styles.header}>
                             <div>
-                                <h2 style={styles.titulo}>Extender estadia</h2>
+                                <h2 style={styles.titulo}>Extender estadía</h2>
                                 <span style={styles.subtitulo}>Hab. {habitacion.numero}</span>
                             </div>
-                            <button style={styles.btnCerrar} onClick={() => setMostrarExtender(false)}>✕</button>
+                            <button style={styles.btnCerrar} onClick={cerrarExtender}>✕</button>
                         </div>
                         <div style={styles.contenido}>
+
+                            {/* Info actual de la reserva */}
                             <div style={styles.formServicio}>
-                                <div style={styles.fila}><span style={styles.etiqueta}>Check-out actual</span><span style={styles.valor}>{formatFecha(reserva.fecha_salida)}</span></div>
-                                <div style={styles.fila}><span style={styles.etiqueta}>Total actual</span><span style={styles.valor}>{toCurrency(reserva.total)}</span></div>
-                                <div style={styles.fila}><span style={styles.etiqueta}>Precio por noche</span><span style={styles.valor}>{toCurrency(habitacionReserva?.precio_noche)}</span></div>
+                                <div style={styles.fila}>
+                                    <span style={styles.etiqueta}>Check-out actual</span>
+                                    <span style={styles.valor}>{formatFecha(reserva.fecha_salida)}</span>
+                                </div>
+                                <div style={styles.fila}>
+                                    <span style={styles.etiqueta}>Total actual</span>
+                                    <span style={{ ...styles.valor, fontWeight: 'bold' }}>{toCurrency(reserva.total)}</span>
+                                </div>
                             </div>
-                            <label style={styles.label}>Dias a agregar</label>
-                            <input style={{ ...styles.input, marginBottom: '12px' }} type="number" min="1" max="30"
+
+                            {/* Precio por noche EDITABLE */}
+                            <label style={{ ...styles.label, marginTop: '4px' }}>
+                                Precio por noche <span style={{ color: '#e74c3c' }}>*</span>
+                            </label>
+                            <div style={{ position: 'relative', marginBottom: '14px' }}>
+                                <span style={styles.inputPrefix}>$</span>
+                                <input
+                                    style={{ ...styles.input, paddingLeft: '22px', fontWeight: '600', fontSize: '15px' }}
+                                    type="number"
+                                    min="0"
+                                    step="1000"
+                                    value={precioNocheExtension}
+                                    onChange={e => setPrecioNocheExtension(Math.max(0, parseFloat(e.target.value) || 0))}
+                                    placeholder="Ingresa el precio por noche"
+                                />
+                            </div>
+
+                            {/* Días a agregar */}
+                            <label style={styles.label}>Días a agregar</label>
+                            <input
+                                style={{ ...styles.input, marginBottom: '14px' }}
+                                type="number"
+                                min="1"
+                                max="365"
                                 value={diasExtra}
-                                onChange={e => setDiasExtra(Math.max(1, parseInt(e.target.value, 10) || 1))} />
-                            {diasExtra > 0 && habitacionReserva?.precio_noche && (
+                                onChange={e => setDiasExtra(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                            />
+
+                            {/* Preview del cálculo (reactivo) */}
+                            {precioNocheExtension > 0 && (
                                 <div style={styles.extensionPreview}>
                                     <div style={styles.fila}>
-                                        <span style={styles.etiqueta}>Costo dias extra</span>
+                                        <span style={styles.etiqueta}>Precio × días</span>
+                                        <span style={{ ...styles.valor, color: '#2980b9' }}>
+                                            {toCurrency(precioNocheExtension)} × {diasExtra}
+                                        </span>
+                                    </div>
+                                    <div style={styles.fila}>
+                                        <span style={styles.etiqueta}>Costo días extra</span>
                                         <span style={{ ...styles.valor, color: '#f39c12', fontWeight: 'bold' }}>
-                                            + {toCurrency(diasExtra * parseFloat(habitacionReserva.precio_noche))}
+                                            + {toCurrency(costoExtension)}
                                         </span>
                                     </div>
                                     <div style={styles.fila}>
                                         <span style={styles.etiqueta}>Nuevo total</span>
-                                        <span style={{ ...styles.valor, color: '#1a1a2e', fontWeight: 'bold' }}>
-                                            {toCurrency(parseFloat(reserva.total || 0) + diasExtra * parseFloat(habitacionReserva.precio_noche))}
+                                        <span style={{ ...styles.valor, color: '#1a1a2e', fontWeight: 'bold', fontSize: '15px' }}>
+                                            {toCurrency(nuevoTotal)}
                                         </span>
                                     </div>
+                                    {nuevaFechaSalida && (
+                                        <div style={{ ...styles.fila, borderBottom: 'none' }}>
+                                            <span style={styles.etiqueta}>Nuevo check-out</span>
+                                            <span style={{ ...styles.valor, color: '#27ae60', fontWeight: 'bold' }}>
+                                                {formatFecha(nuevaFechaSalida)}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             )}
-                            {errorExtension && <p style={styles.errorExtension}>{errorExtension}</p>}
+
+                            {precioNocheExtension === 0 && (
+                                <p style={{ color: '#f39c12', fontSize: '12px', margin: '0 0 12px' }}>
+                                    ⚠️ Ingresa un precio por noche para ver el resumen.
+                                </p>
+                            )}
+
+                            {errorExtension && (
+                                <p style={styles.errorExtension}>⚠️ {errorExtension}</p>
+                            )}
+
                             <div style={styles.extensionActions}>
-                                <button style={styles.btnCancelarExtension} onClick={() => { setMostrarExtender(false); setErrorExtension(''); }}>Cancelar</button>
-                                <button style={{ ...styles.btnAgregar, marginTop: 0, opacity: guardandoExtension ? 0.7 : 1 }}
-                                    onClick={extenderReserva} disabled={guardandoExtension}>
-                                    {guardandoExtension ? 'Guardando...' : `Confirmar +${diasExtra} dia(s)`}
+                                <button style={styles.btnCancelarExtension} onClick={cerrarExtender}>
+                                    Cancelar
+                                </button>
+                                <button
+                                    style={{
+                                        ...styles.btnAgregar,
+                                        marginTop: 0,
+                                        opacity: guardandoExtension || precioNocheExtension <= 0 ? 0.6 : 1,
+                                        cursor: precioNocheExtension <= 0 ? 'not-allowed' : 'pointer'
+                                    }}
+                                    onClick={extenderReserva}
+                                    disabled={guardandoExtension || precioNocheExtension <= 0}
+                                >
+                                    {guardandoExtension ? 'Guardando...' : `Confirmar +${diasExtra} día(s)`}
                                 </button>
                             </div>
                         </div>
@@ -1126,6 +1156,7 @@ const styles = {
     formServicio: { backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px', marginBottom: '15px' },
     label: { display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' },
     input: { width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px', boxSizing: 'border-box' },
+    inputPrefix: { position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: '#666', fontSize: '13px', pointerEvents: 'none' },
     btnAgregar: { marginTop: '12px', padding: '10px 20px', backgroundColor: '#1a1a2e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' },
     tabla: { width: '100%', borderCollapse: 'collapse', fontSize: '13px' },
     thead: { backgroundColor: '#f0f2f5' },
