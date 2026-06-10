@@ -18,6 +18,7 @@ function Caja() {
     const [editando, setEditando] = useState(null);
     const [filtroFecha, setFiltroFecha] = useState('');
     const [mostrarResumenCobro, setMostrarResumenCobro] = useState(false);
+    const [mostrarAbono, setMostrarAbono] = useState(false);
     const [guardandoPago, setGuardandoPago] = useState(false);
     const [editandoPago, setEditandoPago] = useState(null);
     const [guardandoEdicionPago, setGuardandoEdicionPago] = useState(false);
@@ -25,6 +26,8 @@ function Caja() {
     const [mensajeEdicionPago, setMensajeEdicionPago] = useState('');
     const [errorPago, setErrorPago] = useState('');
     const [errorEdicionPago, setErrorEdicionPago] = useState('');
+    const [montoAbono, setMontoAbono] = useState('');
+    const [totalPagadoAcumulado, setTotalPagadoAcumulado] = useState(0);
     const [formPago, setFormPago] = useState({
         fecha_pago: new Date().toISOString().slice(0, 10),
         hora_pago: new Date().toISOString().slice(11, 16),
@@ -318,6 +321,53 @@ function Caja() {
         }
     };
 
+    const registrarAbono = async () => {
+        if (!pagoResumen || !reservaCaja || !montoAbono || parseFloat(montoAbono) <= 0) {
+            setErrorPago('Por favor ingresa un monto válido para el abono.');
+            return;
+        }
+
+        const monto = parseFloat(montoAbono);
+        if (monto > pagoResumen.totalFinal) {
+            setErrorPago(`El abono no puede exceder el total final de ${formatMoney(pagoResumen.totalFinal)}`);
+            return;
+        }
+
+        try {
+            setGuardandoPago(true);
+            setMensajePago('');
+            setErrorPago('');
+
+            const fechaIso = new Date(`${formPago.fecha_pago}T${formPago.hora_pago}:00`).toISOString();
+            const payload = {
+                reserva_id: reservaCaja.id,
+                empleado_id: pagoDesdeHabitacion?.empleado_id || getEmpleadoSesionId() || null,
+                monto: monto,
+                metodo: formPago.metodo,
+                referencia: formPago.referencia?.trim() || '',
+                fecha_pago: fechaIso,
+                notas: (formPago.notas?.trim() || buildNotasPago()) + ` | ABONO PARCIAL: ${formatMoney(monto)}`
+            };
+
+            await pagoService.create(payload);
+            await cargarPagos();
+            await recargarPago();
+
+            setMensajePago(`Abono de ${formatMoney(monto)} registrado correctamente.`);
+            setMontoAbono('');
+            setMostrarAbono(false);
+
+            setTimeout(() => {
+                setMostrarResumenCobro(false);
+            }, 2000);
+        } catch (err) {
+            const msg = err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail;
+            setErrorPago(msg || 'No se pudo registrar el abono.');
+        } finally {
+            setGuardandoPago(false);
+        }
+    };
+
     const guardar = async () => {
         try {
             const dataFinal = { ...formData, total_movimiento: calcularTotal(formData) };
@@ -552,11 +602,58 @@ function Caja() {
                             <p className="error-text" style={{ marginTop: '12px' }}>{errorPago}</p>
                         )}
 
-                        <div className="form-actions" style={{ justifyContent: 'flex-end' }}>
+                        <div className="form-actions" style={{ justifyContent: 'flex-end', gap: '8px' }}>
                             <AppButton variant="info" onClick={registrarPago} disabled={guardandoPago}>
                                 {guardandoPago ? 'Guardando...' : `Registrar pago por ${formatMoney(pagoResumen.totalFinal)}`}
                             </AppButton>
+                            <AppButton variant="secondary"
+                                onClick={() => setMostrarAbono(prev => !prev)}
+                                disabled={guardandoPago}>
+                                {mostrarAbono ? 'Ocultar abono' : 'Registrar abono'}
+                            </AppButton>
                         </div>
+
+                        {mostrarAbono && (
+                            <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '4px', border: '1px solid #dee2e6' }}>
+                                <h5 style={{ margin: '0 0 12px 0', color: '#495057' }}>Registrar abono parcial</h5>
+                                <div className="form-grid form-grid--2">
+                                    <div>
+                                        <label className="label">Saldo pendiente</label>
+                                        <input className="input-base full-width" type="text"
+                                            value={formatMoney(pagoResumen.totalFinal)} disabled />
+                                    </div>
+                                    <div>
+                                        <label className="label">Monto del abono *</label>
+                                        <input className="input-base full-width" type="number"
+                                            placeholder="Ej: 800000"
+                                            value={montoAbono}
+                                            onChange={e => setMontoAbono(e.target.value)}
+                                            min="0"
+                                            max={pagoResumen.totalFinal} />
+                                    </div>
+                                </div>
+                                {montoAbono && (
+                                    <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#e8f4f8', borderRadius: '3px' }}>
+                                        <strong>Saldo pendiente después del abono:</strong> {formatMoney(pagoResumen.totalFinal - parseFloat(montoAbono || 0))}
+                                    </div>
+                                )}
+                                <div className="form-actions" style={{ justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
+                                    <AppButton variant="success"
+                                        onClick={registrarAbono}
+                                        disabled={guardandoPago || !montoAbono || parseFloat(montoAbono) <= 0}>
+                                        {guardandoPago ? 'Registrando...' : 'Registrar abono'}
+                                    </AppButton>
+                                    <AppButton variant="secondary"
+                                        onClick={() => {
+                                            setMostrarAbono(false);
+                                            setMontoAbono('');
+                                        }}
+                                        disabled={guardandoPago}>
+                                        Cancelar
+                                    </AppButton>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

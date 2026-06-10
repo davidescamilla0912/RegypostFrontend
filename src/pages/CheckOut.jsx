@@ -139,7 +139,9 @@ function CheckOut() {
                             const resCons = await consumoService.getByReserva(r.id);
                             consumos = normalizarLista(resCons);
                         } catch {}
-                        const totalConsumos = consumos.reduce((s, c) => s + Number(c.total || 0), 0);
+                        const totalConsumos = consumos // consumos asociados a esta reserva, pero solo los que no estén cancelados
+                        .filter(c => (c.estado || '').toLowerCase() !== 'cancelado')
+                        .reduce((s, c) => s + Number(c.total || 0), 0);
                         const totalReserva = Number(r.total || r.valor_total || 0) || 0;
                         const anticipo = Number(r.anticipo) || 0;
                         const saldoPendiente = Math.max(totalReserva - anticipo, 0);
@@ -165,7 +167,9 @@ function CheckOut() {
                             const resCons = await consumoService.getByReserva(r.id);
                             consumos = normalizarLista(resCons);
                         } catch {}
-                        const totalConsumos = consumos.reduce((s, c) => s + Number(c.total || 0), 0);
+                        const totalConsumos = consumos
+                        .filter(c => (c.estado || '').toLowerCase() !== 'cancelado')
+                        .reduce((s, c) => s + Number(c.total || 0), 0);
                         const totalReserva = Number(r.total || r.valor_total || 0) || 0;
                         const anticipo = Number(r.anticipo) || 0;
                         const saldoPendiente = Math.max(totalReserva - anticipo, 0);
@@ -280,7 +284,9 @@ function CheckOut() {
         const precioNoche  = Number(detalle.precio_noche) || 0;
         const totalReserva = Number(getValue(reserva, 'total', 'valor_total')) || noches * precioNoche;
         const anticipo     = Number(getValue(reserva, 'anticipo')) || 0;
-        const totalConsumos = consumos.reduce((sum, c) => sum + Number(c.total || 0), 0);
+        const totalConsumos = consumos
+        .filter(c => (c.estado || '').toLowerCase() !== 'cancelado')
+        .reduce((sum, c) => sum + Number(c.total || 0), 0);
         const saldoPendiente = Math.max(totalReserva - anticipo, 0);
         const totalFinal     = saldoPendiente + totalConsumos;
 
