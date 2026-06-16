@@ -471,7 +471,9 @@ function CheckOut() {
                                         const saldo           = Number(getValue(reserva, 'saldo_pendiente')) || Math.max(total - anticipo, 0);
                                         const abierta         = expandida === reserva.id;
                                         const consumos        = consumosPorReserva[reserva.id] || [];
-                                        const totalConsumos   = consumos.reduce((s, c) => s + Number(c.total || 0), 0);
+                                        const totalConsumos   = consumos
+                                            .filter(c => (c.estado || '').toLowerCase() !== 'cancelado')
+                                            .reduce((s, c) => s + Number(c.total || 0), 0);
                                         const enProceso       = procesando === reserva.id;
                                         const estadoColor     = colorEstadoBadge['check-in'];
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import reservaService from '../services/reservaService';
 import habitacionService from '../services/habitacionService';
 import clienteService from '../services/clienteService';
+import acompananteService from '../services/acompananteService';
 import { AppButton, PageHeader } from '../components/ui';
 import '../components/ui/ui.css';
 
@@ -30,6 +31,15 @@ const initialForm = {
     numAdultos: 1,
     numNinos: 0,
     observaciones: ''
+};
+
+const initialFormAcompanante = {
+    tipo_documento: 'CC',
+    numero_documento: '',
+    nombre: '',
+    apellido: '',
+    telefono: '',
+    es_menor: false
 };
 
 const calcularNoches = (checkIn, checkOut) => {
@@ -82,9 +92,27 @@ function Reservas() {
     const [reservaAConfirmar, setReservaAConfirmar] = useState(null);
     const [anticipoConfirmacion, setAnticipoConfirmacion] = useState('');
 
+    // ── Acompañantes (modal) ────────────────────────────────────────────────
+    const [acompanantes, setAcompanantes] = useState([]);
+    const [mostrarModalAcompanantes, setMostrarModalAcompanantes] = useState(false);
+    const [formAcompanante, setFormAcompanante] = useState(initialFormAcompanante);
+    const [errorAcompanante, setErrorAcompanante] = useState('');
+
     useEffect(() => {
         cargarDatos();
     }, []);
+
+     // Sincroniza ADULTOS/NIÑOS del formulario con titular + acompañantes
+    useEffect(() => {
+        const acompanantesAdultos = acompanantes.filter((a) => !a.es_menor).length;
+        const acompanantesMenores = acompanantes.filter((a) => a.es_menor).length;
+
+        setForm((prev) => ({
+            ...prev,
+            numAdultos: acompanantesAdultos + 1, // titular siempre cuenta
+            numNinos: acompanantesMenores
+        }));
+    }, [acompanantes]);
 
     const cargarDatos = async () => {
         await Promise.all([cargarReservas(), cargarHabitaciones(), cargarClientes()]);
@@ -229,48 +257,83 @@ function Reservas() {
         setForm((prev) => ({ ...prev, [name]: value }));
     };
 
+    // ── Acompañantes ─────────────────────────────────────────────────────────
+    const onChangeFormAcompanante = (e) => {
+         const { name, value, type, checked } = e.target;
+            setFormAcompanante((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    };
+
+    const agregarAcompanante = () => {
+        const { numero_documento, nombre, apellido } = formAcompanante;
+        if (!numero_documento.trim() || !nombre.trim() || !apellido.trim()) {
+            setErrorAcompanante('Documento, nombre y apellido son obligatorios.');
+            return;
+        }
+
+        const yaExiste = acompanantes.some(
+            (a) => a.numero_documento.trim() === numero_documento.trim()
+        );
+        if (yaExiste) {
+            setErrorAcompanante('Ya agregaste un acompañante con ese documento.');
+            return;
+        }
+
+        setErrorAcompanante('');
+        setAcompanantes((prev) => [...prev, { ...formAcompanante }]);
+        setFormAcompanante(initialFormAcompanante);
+    };
+
+    const quitarAcompanante = (index) => {
+        setAcompanantes((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const cerrarModalAcompanantes = () => {
+        setMostrarModalAcompanantes(false);
+        setErrorAcompanante('');
+        setFormAcompanante(initialFormAcompanante);
+    };
+
     const validarFormulario = () => {
-    if (!form.clienteId || !form.habitacionId || !form.checkIn || !form.checkOut) {
-        setError('Cliente, Habitacion, Check-in y Check-out son obligatorios.');
-        return false;
-    }
-    if (valoresCalculados.noches <= 0) {
-        setError('La fecha de Check-out debe ser posterior al Check-in.');
-        return false;
-    }
-    if (habitacionesNoDisponibles.has(Number(form.habitacionId))) {
-        setError('La habitación seleccionada no se puede reservar por cruce de fechas.');
-        return false;
-    }
+        if (!form.clienteId || !form.habitacionId || !form.checkIn || !form.checkOut) {
+            setError('Cliente, Habitacion, Check-in y Check-out son obligatorios.');
+            return false;
+        }
+        if (valoresCalculados.noches <= 0) {
+            setError('La fecha de Check-out debe ser posterior al Check-in.');
+            return false;
+        }
+        if (habitacionesNoDisponibles.has(Number(form.habitacionId))) {
+            setError('La habitación seleccionada no se puede reservar por cruce de fechas.');
+            return false;
+        }
 
-    // ── NUEVO: bloquear si hay checkin activo vencido en esa habitación ──
-    const checkinVencido = reservas.some((r) => {
-        const estado = fromApiEstado(r?.estado);
-        if (estado !== 'check-in') return false;
+        // ── Bloquear si hay checkin activo vencido en esa habitación ──
+        const checkinVencido = reservas.some((r) => {
+            const estado = fromApiEstado(r?.estado);
+            if (estado !== 'check-in') return false;
 
-        const habId = getHabitacionIdFromReserva(r);
-        if (String(habId) !== String(form.habitacionId)) return false;
+            const habId = getHabitacionIdFromReserva(r);
+            if (String(habId) !== String(form.habitacionId)) return false;
 
-        const fechaSalida = toDateSafe(getFechaSalidaReserva(r));
-        const hoy = new Date();
-        hoy.setHours(0, 0, 0, 0);
-        return fechaSalida && fechaSalida < hoy;
-    });
+            const fechaSalida = toDateSafe(getFechaSalidaReserva(r));
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            return fechaSalida && fechaSalida < hoy;
+        });
 
-    if (checkinVencido) {
-        setError('Esta habitación tiene un huésped con estadía vencida. Completa el Check-Out desde la pantalla CheckOut antes de crear una nueva reserva.');
-        return false;
-    }
-    // ─────────────────────────────────────────────────────────────────────
+        if (checkinVencido) {
+            setError('Esta habitación tiene un huésped con estadía vencida. Completa el Check-Out desde la pantalla CheckOut antes de crear una nueva reserva.');
+            return false;
+        }
 
-    const habitacionSeleccionada = habitaciones.find((h) => String(h.id) === String(form.habitacionId));
-    const estadoHabitacion = normalizarEstado(habitacionSeleccionada?.estado);
-    if (estadoHabitacion === 'mantenimiento' || estadoHabitacion === 'bloqueada') {
-        setError('No se puede reservar habitaciones en mantenimiento o bloqueadas.');
-        return false;
-    }
-    return true;
-};
+        const habitacionSeleccionada = habitaciones.find((h) => String(h.id) === String(form.habitacionId));
+        const estadoHabitacion = normalizarEstado(habitacionSeleccionada?.estado);
+        if (estadoHabitacion === 'mantenimiento' || estadoHabitacion === 'bloqueada') {
+            setError('No se puede reservar habitaciones en mantenimiento o bloqueadas.');
+            return false;
+        }
+        return true;
+    };
 
     const crearReserva = async (e) => {
         e.preventDefault();
@@ -321,8 +384,17 @@ function Reservas() {
                 }
             }
 
+            if (creada?.id && acompanantes.length > 0) {
+                try {
+                    await acompananteService.createBulk(creada.id, acompanantes);
+                } catch (acompErr) {
+                    console.warn('No se pudieron guardar los acompañantes', acompErr);
+                }
+            }
+
             await cargarReservas();
             setForm(initialForm);
+            setAcompanantes([]);
         } catch (err) {
             console.error('Error creando reserva', err);
             const backendMessage = err?.response?.data?.message || err?.response?.data?.error || err?.response?.data?.detail;
@@ -393,30 +465,30 @@ function Reservas() {
     };
 
     const hacerCheckin = async (reserva) => {
-    if (!reserva?.id) return;
-    setError('');
+        if (!reserva?.id) return;
+        setError('');
 
-    const fechaEntrada = getValue(reserva, 'fecha_entrada', 'check_in', 'checkIn');
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    const fechaCheckin = new Date(`${fechaEntrada}T00:00:00`);
-    const diasRestantes = Math.ceil((fechaCheckin - hoy) / (1000 * 60 * 60 * 24));
+        const fechaEntrada = getValue(reserva, 'fecha_entrada', 'check_in', 'checkIn');
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        const fechaCheckin = new Date(`${fechaEntrada}T00:00:00`);
+        const diasRestantes = Math.ceil((fechaCheckin - hoy) / (1000 * 60 * 60 * 24));
 
-    if (isNaN(fechaCheckin.getTime()) || fechaCheckin > hoy) {
-        setError(`Check-in no disponible. Faltan ${diasRestantes} día(s) — disponible el ${fechaEntrada}.`);
-        return;
-    }
+        if (isNaN(fechaCheckin.getTime()) || fechaCheckin > hoy) {
+            setError(`Check-in no disponible. Faltan ${diasRestantes} día(s) — disponible el ${fechaEntrada}.`);
+            return;
+        }
 
-    try {
-        await reservaService.updateEstado(reserva.id, 'checkin');
-        await cargarDatos();
-        navigate('/checkout', { state: { reservaId: reserva.id } });
-    } catch (err) {
-        console.error('Error haciendo checkin', err);
-        const backendMessage = err?.response?.data?.message || err?.response?.data?.error;
-        setError(backendMessage || 'No se pudo hacer el check-in.');
-    }
-};
+        try {
+            await reservaService.updateEstado(reserva.id, 'checkin');
+            await cargarDatos();
+            navigate('/checkout', { state: { reservaId: reserva.id } });
+        } catch (err) {
+            console.error('Error haciendo checkin', err);
+            const backendMessage = err?.response?.data?.message || err?.response?.data?.error;
+            setError(backendMessage || 'No se pudo hacer el check-in.');
+        }
+    };
 
     const etiquetaEstado = (estado) => {
         const key = fromApiEstado(estado);
@@ -555,6 +627,13 @@ function Reservas() {
                     <input className="input-base full-width" name="observaciones" value={form.observaciones} onChange={onChange} placeholder="Observaciones" />
                 </div>
 
+                <div className="form-footer" style={{ marginTop: 0, marginBottom: 4 }}>
+                    <AppButton type="button" variant="secondary" onClick={() => setMostrarModalAcompanantes(true)}>
+                        👥 Acompañantes ({acompanantes.length})
+                    </AppButton>
+                    <span />
+                </div>
+
                 <div className="form-footer">
                     {error ? <p className="error-text mb-0">{error}</p> : <span />}
                     <AppButton type="submit" disabled={guardando}>
@@ -562,6 +641,126 @@ function Reservas() {
                     </AppButton>
                 </div>
             </form>
+
+            {/* ── Modal Acompañantes (se registran junto con la reserva) ── */}
+            {mostrarModalAcompanantes && (
+                <div
+                    style={{
+                        position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.55)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        zIndex: 1200, padding: '16px'
+                    }}
+                    onClick={cerrarModalAcompanantes}
+                >
+                    <div className="panel" style={{ width: '100%', maxWidth: '640px', marginBottom: 0 }} onClick={(e) => e.stopPropagation()}>
+                        <h3 className="panel-title">👥 Acompañantes de la reserva</h3>
+                        <p className="muted-text" style={{ marginTop: -8 }}>
+                            Se registrarán automáticamente al guardar la reserva.
+                        </p>
+
+                        <div className="form-grid form-grid--3">
+                            <select
+                                className="select-base full-width"
+                                name="tipo_documento"
+                                value={formAcompanante.tipo_documento}
+                                onChange={onChangeFormAcompanante}
+                            >
+                                <option value="CC">CC</option>
+                                <option value="CE">CE</option>
+                                <option value="Pasaporte">Pasaporte</option>
+                                <option value="NIT">NIT</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                            <input
+                                className="input-base full-width"
+                                name="numero_documento"
+                                placeholder="Nro. Documento *"
+                                value={formAcompanante.numero_documento}
+                                onChange={onChangeFormAcompanante}
+                            />
+                            <input
+                                className="input-base full-width"
+                                name="telefono"
+                                placeholder="Teléfono"
+                                value={formAcompanante.telefono}
+                                onChange={onChangeFormAcompanante}
+                            />
+                            <input
+                                className="input-base full-width"
+                                name="nombre"
+                                placeholder="Nombre *"
+                                value={formAcompanante.nombre}
+                                onChange={onChangeFormAcompanante}
+                            />
+                            <input
+                                className="input-base full-width"
+                                name="apellido"
+                                placeholder="Apellido *"
+                                value={formAcompanante.apellido}
+                                onChange={onChangeFormAcompanante}
+                            />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <input
+                                    type="checkbox"
+                                    id="esMenorFormAcompanante"
+                                    name="es_menor"
+                                    checked={formAcompanante.es_menor}
+                                    onChange={onChangeFormAcompanante}
+                                    style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                                />
+                                <label htmlFor="esMenorFormAcompanante" style={{ cursor: 'pointer', fontSize: '13px', margin: 0 }}>
+                                    Es menor de edad
+                                </label>
+                            </div>
+                            <AppButton type="button" onClick={agregarAcompanante}>+ Agregar a la lista</AppButton>
+                        </div>
+
+                        {errorAcompanante && <p className="error-text mb-0">{errorAcompanante}</p>}
+
+                        {acompanantes.length === 0 ? (
+                            <p className="muted-text">No has agregado acompañantes todavía.</p>
+                        ) : (
+                            <div className="table-shell" style={{ marginTop: 12 }}>
+                                <table className="table-base">
+                                    <thead>
+                                        <tr>
+                                            <th>Tipo</th>
+                                            <th>Documento</th>
+                                            <th>Nombre</th>
+                                            <th>Apellido</th>
+                                            <th>Teléfono</th>
+                                            <th>Edad</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {acompanantes.map((a, index) => (
+                                            <tr key={`${a.numero_documento}-${index}`}>
+                                                <td>{a.tipo_documento}</td>
+                                                <td>{a.numero_documento}</td>
+                                                <td>{a.nombre}</td>
+                                                <td>{a.apellido}</td>
+                                                <td>{a.telefono || '-'}</td>
+                                                <td>{a.es_menor ? 'Menor' : 'Adulto'}</td>
+                                                <td>
+                                                    <AppButton size="sm" variant="danger" onClick={() => quitarAcompanante(index)}>
+                                                        Eliminar
+                                                    </AppButton>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        <div className="form-footer" style={{ marginTop: 16 }}>
+                            <span />
+                            <AppButton type="button" onClick={cerrarModalAcompanantes}>Listo</AppButton>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {loading ? (
                 <p className="page-loading">Cargando reservas...</p>

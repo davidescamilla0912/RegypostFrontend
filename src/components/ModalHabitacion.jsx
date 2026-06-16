@@ -5,8 +5,10 @@ import consumoService from '../services/consumoService';
 import clienteService from '../services/clienteService';
 import empleadoService from '../services/empleadoService';
 import habitacionService from '../services/habitacionService';
+import acompananteService from '../services/acompananteService';
 import useReservaPagada from '../hooks/useReservaPagada';
 import ReservaPagadaBadge from './ui/ReservaPagadaBadge';
+
 
 // ─── Cache simple en memoria ─────────────────────────────────────────────────
 const cache = {};
@@ -94,6 +96,20 @@ function ModalHabitacion({
     const [guardandoExtension, setGuardandoExtension] = useState(false);
     const [errorExtension, setErrorExtension] = useState('');
     const [editandoHuespedes, setEditandoHuespedes] = useState(false);
+    const [acompanantes, setAcompanantes] = useState([]);
+    const [mostrandoAcompanantes, setMostrandoAcompanantes] = useState(false);
+    const [cargandoAcompanantes, setCargandoAcompanantes] = useState(false);
+    const [mostrarModalAcompanante, setMostrarModalAcompanante] = useState(false);
+    const [formNuevoAcompanante, setFormNuevoAcompanante] = useState({
+        tipo_documento: 'CC',
+        numero_documento: '',
+        nombre: '',
+        apellido: '',
+        telefono: '',
+        es_menor: false
+    });
+    const [guardandoAcompanante, setGuardandoAcompanante] = useState(false);
+    const [errorAcompanante, setErrorAcompanante] = useState('');
     const [numAdultos, setNumAdultos] = useState(0);
     const [numNinos, setNumNinos] = useState(0);
     const [guardandoHuespedes, setGuardandoHuespedes] = useState(false);
@@ -387,6 +403,110 @@ function ModalHabitacion({
             setErrorHuespedes('Error de conexión');
         } finally {
             setGuardandoHuespedes(false);
+        }
+    };
+
+    // ── Acompañantes ───────────────────────────────────────────────────────────
+    const cargarAcompanantes = async () => {
+        if (!reserva?.id) return;
+        setCargandoAcompanantes(true);
+        try {
+            const res = await acompananteService.getByReserva(reserva.id);
+            const data = Array.isArray(res.data) ? res.data : Array.isArray(res.data?.data) ? res.data.data : [];
+            setAcompanantes(data);
+        } catch {
+            setAcompanantes([]);
+        } finally {
+            setCargandoAcompanantes(false);
+        }
+    };
+
+    const toggleAcompanantes = () => {
+        if (!mostrandoAcompanantes) {
+            cargarAcompanantes();
+        }
+        setMostrandoAcompanantes(!mostrandoAcompanantes);
+    };
+
+    const abrirModalAcompanante = () => {
+        setFormNuevoAcompanante({ tipo_documento: 'CC', numero_documento: '', nombre: '', apellido: '', telefono: '', es_menor: false });
+        setErrorAcompanante('');
+        setMostrarModalAcompanante(true);
+    };
+
+    const onChangeNuevoAcompanante = (e) => {
+        const { name, value, type, checked } = e.target;
+        setFormNuevoAcompanante((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    };
+
+    // ── Sincroniza num_adultos / num_ninos según titular + acompañantes ────────
+    const sincronizarPersonas = async (listaAcompanantes) => {
+        if (!reserva?.id) return;
+
+        const acompanantesAdultos = listaAcompanantes.filter((a) => !a.es_menor).length;
+        const acompanantesMenores = listaAcompanantes.filter((a) => a.es_menor).length;
+
+        const nuevoNumAdultos = Math.max(acompanantesAdultos + 1, 1); // titular siempre cuenta
+        const nuevoNumNinos = acompanantesMenores;
+
+        try {
+            const BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
+            const token = localStorage.getItem('token') || '';
+            const res = await fetch(`${BASE_URL}/reservas/${reserva.id}/personas`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ num_adultos: nuevoNumAdultos, num_ninos: nuevoNumNinos })
+            });
+            if (!res.ok) {
+                console.warn('No se pudo sincronizar personas con acompañantes');
+                return;
+            }
+            setReserva((prev) => ({ ...prev, num_adultos: nuevoNumAdultos, num_ninos: nuevoNumNinos }));
+            setNumAdultos(nuevoNumAdultos);
+            setNumNinos(nuevoNumNinos);
+            onUpdate?.();
+        } catch (err) {
+            console.warn('Error sincronizando personas con acompañantes', err);
+        }
+    };
+
+    const guardarAcompanante = async () => {
+        if (!reserva?.id) return;
+        const { numero_documento, nombre, apellido } = formNuevoAcompanante;
+        if (!numero_documento.trim() || !nombre.trim() || !apellido.trim()) {
+            setErrorAcompanante('Documento, nombre y apellido son obligatorios');
+            return;
+        }
+
+        setGuardandoAcompanante(true);
+        setErrorAcompanante('');
+        try {
+            await acompananteService.create(reserva.id, formNuevoAcompanante);
+
+            const res = await acompananteService.getByReserva(reserva.id);
+            const lista = Array.isArray(res.data) ? res.data : Array.isArray(res.data?.data) ? res.data.data : [];
+            setAcompanantes(lista);
+            setMostrandoAcompanantes(true);
+            setMostrarModalAcompanante(false);
+
+            await sincronizarPersonas(lista);
+        } catch (err) {
+            const msg = err?.response?.data?.error || 'No se pudo registrar el acompañante';
+            setErrorAcompanante(msg);
+        } finally {
+            setGuardandoAcompanante(false);
+        }
+    };
+
+    const eliminarAcompanante = async (id) => {
+        if (!window.confirm('¿Eliminar este acompañante?')) return;
+        try {
+            await acompananteService.delete(id);
+            const nuevaLista = acompanantes.filter((a) => a.id !== id);
+            setAcompanantes(nuevaLista);
+            await sincronizarPersonas(nuevaLista);
+        } catch (err) {
+            console.error('Error eliminando acompañante', err);
         }
     };
 
@@ -769,6 +889,48 @@ function ModalHabitacion({
                                     </>
                                 )}
                             </div>
+
+                            <div style={{ marginTop: '14px', backgroundColor: '#f9f9f9', borderRadius: '8px', padding: '14px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                    <h4 style={{ margin: 0, color: '#1a1a2e', fontSize: '14px' }}>
+                                        📋 Acompañantes {mostrandoAcompanantes && !cargandoAcompanantes ? `(${acompanantes.length})` : ''}
+                                    </h4>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <button style={{ ...styles.btnCambio, fontSize: '12px', padding: '5px 12px' }}
+                                            onClick={abrirModalAcompanante}>
+                                            + Agregar
+                                        </button>
+                                        <button style={{ ...styles.btnCambio, fontSize: '12px', padding: '5px 12px', backgroundColor: '#95a5a6' }}
+                                            onClick={toggleAcompanantes}>
+                                            {mostrandoAcompanantes ? '🔼 Ocultar' : '👁️ Ver'}
+                                        </button>
+                                    </div>
+                                </div>
+                                {mostrandoAcompanantes && (
+                                    cargandoAcompanantes ? (
+                                        <p style={{ color: '#999', fontSize: '13px' }}>Cargando acompañantes...</p>
+                                    ) : acompanantes.length === 0 ? (
+                                        <p style={{ color: '#999', fontSize: '13px' }}>Sin acompañantes registrados</p>
+                                    ) : (
+                                        <div style={{ fontSize: '13px' }}>
+                                            {acompanantes.map((a) => (
+                                                <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #eee' }}>
+                                                    <span>
+                                                        <strong>{a.nombre} {a.apellido}</strong>
+                                                        {a.es_menor ? (
+                                                            <span style={{ marginLeft: '6px', fontSize: '11px', padding: '2px 6px', borderRadius: '4px', backgroundColor: '#fde68a', color: '#92400e', fontWeight: 700 }}>
+                                                                MENOR
+                                                            </span>
+                                                        ) : null}
+                                                    </span>
+                                                    <span style={{ color: '#666' }}>{a.tipo_documento} {a.numero_documento}{a.telefono ? ` · Tel: ${a.telefono}` : ''}</span>
+                                                    <button style={styles.btnEliminar} onClick={() => eliminarAcompanante(a.id)}>✕</button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )
+                                )}
+                            </div>
                         </div>
                     )}
 
@@ -1064,6 +1226,104 @@ function ModalHabitacion({
                                     onClick={ejecutarCambio}
                                     disabled={guardandoCambio || !habSeleccionada || !motivoCambio.trim()}>
                                     {guardandoCambio ? 'Realizando cambio...' : `Confirmar cambio → Hab. ${habSeleccionada?.numero || '?'}`}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Modal agregar acompañante ── */}
+            {mostrarModalAcompanante && reserva && (
+                <div style={styles.overlay} onClick={() => setMostrarModalAcompanante(false)}>
+                    <div style={{ ...styles.modal, width: '480px' }} onClick={(e) => e.stopPropagation()}>
+                        <div style={styles.header}>
+                            <div>
+                                <h2 style={styles.titulo}>Agregar acompañante</h2>
+                                <span style={styles.subtitulo}>Reserva #{reserva.id}</span>
+                            </div>
+                            <button style={styles.btnCerrar} onClick={() => setMostrarModalAcompanante(false)}>✕</button>
+                        </div>
+                        <div style={styles.contenido}>
+                            <div style={styles.grid2}>
+                                <div>
+                                    <label style={styles.label}>Tipo Documento</label>
+                                    <select
+                                        style={styles.input}
+                                        name="tipo_documento"
+                                        value={formNuevoAcompanante.tipo_documento}
+                                        onChange={onChangeNuevoAcompanante}
+                                    >
+                                        <option value="CC">CC</option>
+                                        <option value="CE">CE</option>
+                                        <option value="Pasaporte">Pasaporte</option>
+                                        <option value="NIT">NIT</option>
+                                        <option value="Otro">Otro</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style={styles.label}>Nro. Documento *</label>
+                                    <input
+                                        style={styles.input}
+                                        name="numero_documento"
+                                        value={formNuevoAcompanante.numero_documento}
+                                        onChange={onChangeNuevoAcompanante}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={styles.label}>Nombre *</label>
+                                    <input
+                                        style={styles.input}
+                                        name="nombre"
+                                        value={formNuevoAcompanante.nombre}
+                                        onChange={onChangeNuevoAcompanante}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={styles.label}>Apellido *</label>
+                                    <input
+                                        style={styles.input}
+                                        name="apellido"
+                                        value={formNuevoAcompanante.apellido}
+                                        onChange={onChangeNuevoAcompanante}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={styles.label}>Teléfono</label>
+                                    <input
+                                        style={styles.input}
+                                        name="telefono"
+                                        value={formNuevoAcompanante.telefono}
+                                        onChange={onChangeNuevoAcompanante}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', paddingBottom: '6px' }}>
+                                    <input
+                                        type="checkbox"
+                                        id="esMenorAcompanante"
+                                        name="es_menor"
+                                        checked={formNuevoAcompanante.es_menor}
+                                        onChange={onChangeNuevoAcompanante}
+                                        style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                                    />
+                                    <label htmlFor="esMenorAcompanante" style={{ cursor: 'pointer', color: '#333', fontSize: '13px', margin: 0 }}>
+                                        Es menor de edad
+                                    </label>
+                                </div>
+                            </div>
+
+                            {errorAcompanante && <p style={styles.errorExtension}>⚠️ {errorAcompanante}</p>}
+
+                            <div style={styles.extensionActions}>
+                                <button style={styles.btnCancelarExtension} onClick={() => setMostrarModalAcompanante(false)}>
+                                    Cancelar
+                                </button>
+                                <button
+                                    style={{ ...styles.btnAgregar, marginTop: 0, opacity: guardandoAcompanante ? 0.7 : 1 }}
+                                    onClick={guardarAcompanante}
+                                    disabled={guardandoAcompanante}
+                                >
+                                    {guardandoAcompanante ? 'Guardando...' : 'Guardar'}
                                 </button>
                             </div>
                         </div>
