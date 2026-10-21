@@ -4,11 +4,35 @@ Interfaz web para la administración de un hotel. RegyHotel reúne en un solo pa
 
 ## Capturas de pantalla
 
-Las imágenes se muestran desde `docs/screenshots/`. Añade las capturas de la aplicación con estos nombres para que GitHub las renderice en esta sección:
+### Panel principal
 
-![Panel principal de RegyHotel](docs/screenshots/dashboard.png)
+![Panel principal de RegyHotel](docs/screenshots/Screenshot%202026-10-20%20221055.png)
 
-![Gestión de reservas de RegyHotel](docs/screenshots/reservas.png)
+### Clientes
+
+![Gestión de clientes](docs/screenshots/Screenshot%202026-10-20%20221147.png)
+
+### Reservas
+
+![Gestión de reservas](docs/screenshots/Screenshot%202026-10-20%20221216.png)
+
+### Habitaciones
+
+![Listado de habitaciones](docs/screenshots/Screenshot%202026-10-20%20221230.png)
+
+![Detalle de una habitación y su reserva](docs/screenshots/Screenshot%202026-10-20%20221251.png)
+
+### Inventario
+
+![Gestión de inventario](docs/screenshots/Screenshot%202026-10-20%20221313.png)
+
+### Check-out
+
+![Gestión de check-out](docs/screenshots/Screenshot%202026-10-20%20221337.png)
+
+### Empleados
+
+![Gestión de empleados](docs/screenshots/Screenshot%202026-10-20%20221401.png)
 
 ## Funcionalidades
 

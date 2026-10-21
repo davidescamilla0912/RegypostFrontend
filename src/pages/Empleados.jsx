@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import empleadoService from '../services/empleadoService';
 import { AppButton, DataTable, PageHeader } from '../components/ui';
+import { extraerLista } from '../utils/apiResponse';
 import '../components/ui/ui.css';
 
 function Empleados() {
@@ -16,7 +17,7 @@ function Empleados() {
     const cargarEmpleados = async () => {
         try {
             const res = await empleadoService.getAll();
-            setEmpleados(res.data);
+            setEmpleados(extraerLista(res));
         } catch (err) {
             console.error('Error cargando empleados', err);
         } finally {

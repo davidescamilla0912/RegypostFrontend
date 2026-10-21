@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import clienteService from '../services/clienteService';
 import { AppButton, DataTable, PageHeader } from '../components/ui';
+import { extraerLista } from '../utils/apiResponse';
 import '../components/ui/ui.css';
 
 function Clientes() {
@@ -17,7 +18,7 @@ function Clientes() {
     const cargarClientes = async () => {
         try {
             const res = await clienteService.getAll();
-            setClientes(res.data);
+            setClientes(extraerLista(res));
         } catch (err) {
             console.error('Error cargando clientes', err);
         } finally {
@@ -29,7 +30,7 @@ function Clientes() {
         if (!busqueda) return cargarClientes();
         try {
             const res = await clienteService.search(busqueda);
-            setClientes(res.data);
+            setClientes(extraerLista(res));
         } catch (err) {
             console.error('Error buscando', err);
         }

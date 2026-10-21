@@ -4,6 +4,7 @@ import habitacionService from '../services/habitacionService';
 import reservaService from '../services/reservaService';
 import ModalHabitacion from '../components/ModalHabitacion';
 import { AppButton, PageHeader } from '../components/ui';
+import { extraerLista } from '../utils/apiResponse';
 import '../components/ui/ui.css';
 
 function Habitaciones() {
@@ -24,11 +25,10 @@ function Habitaciones() {
                 res = await habitacionService.getAll();
             } else if (filtroEstado === 'reservada') {
                 res = await habitacionService.getAll();
-                const habitacionesFiltradas = Array.isArray(res.data)
-                    ? res.data.filter((habitacion) =>
+                const habitacionesFiltradas = extraerLista(res)
+                    .filter((habitacion) =>
                         String(habitacion.estado || '').toLowerCase() === 'reservada'
                     )
-                    : [];
                 setHabitaciones(habitacionesFiltradas);
                 return;
             } else {
@@ -37,9 +37,9 @@ function Habitaciones() {
             
             // Cargar reservas para verificar habitaciones disponibles con futuras
             const resReservas = await reservaService.getAll();
-            const reservasLista = Array.isArray(resReservas.data) ? resReservas.data : (resReservas.data?.data || []);
+            const reservasLista = extraerLista(resReservas);
             
-            const habitacionesData = Array.isArray(res.data) ? res.data : [];
+            const habitacionesData = extraerLista(res);
             const hoy = new Date();
             hoy.setHours(0, 0, 0, 0);
             
@@ -78,7 +78,7 @@ function Habitaciones() {
 
         if (String(estado).toLowerCase() === 'disponible') {
             const res = await reservaService.tieneFuturas(id);
-            const tiene = res.data?.tiene_reservas_futuras;
+            const tiene = res.data?.data?.tiene_reservas_futuras ?? res.data?.tiene_reservas_futuras;
 
             if (tiene) {
                 finalEstado = 'reservada';

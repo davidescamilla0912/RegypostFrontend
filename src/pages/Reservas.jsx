@@ -429,7 +429,7 @@ function Reservas() {
 
             setReservas((prev) => prev.map((r) => (
                 r.id === reserva.id
-                    ? { ...r, estado: 'confirmada', anticipo: response.data.anticipo, saldo_pendiente: response.data.saldo_pendiente }
+                    ? { ...r, estado: 'confirmada', anticipo: response.data?.data?.anticipo, saldo_pendiente: response.data?.data?.saldo_pendiente }
                     : r
             )));
 

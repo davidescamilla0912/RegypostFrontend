@@ -8,6 +8,7 @@ import habitacionService from '../services/habitacionService';
 import acompananteService from '../services/acompananteService';
 import useReservaPagada from '../hooks/useReservaPagada';
 import ReservaPagadaBadge from './ui/ReservaPagadaBadge';
+import { extraerLista, extraerRecurso } from '../utils/apiResponse';
 
 
 // ─── Cache simple en memoria ─────────────────────────────────────────────────
@@ -242,16 +243,15 @@ function ModalHabitacion({
             setReserva(null);
 
             const resReservas = await reservaService.getByEstado('checkin');
-            const reservasCheckin = Array.isArray(resReservas.data)
-                ? resReservas.data
-                : (resReservas.data?.data || []);
+            const reservasCheckin = extraerLista(resReservas);
 
             let reservaEncontrada = null;
             let habitacionReservaEncontrada = null;
+            let consumosData = [];
 
             for (const r of reservasCheckin) {
                 const resHabs = await reservaService.getHabitaciones(r.id);
-                const habsArray = Array.isArray(resHabs.data) ? resHabs.data : (resHabs.data?.data || []);
+                const habsArray = extraerLista(resHabs);
                 const habEnReserva = habsArray.find(h => h.habitacion_id === habitacion.id);
                 if (habEnReserva) {
                     reservaEncontrada = r;
@@ -267,15 +267,14 @@ function ModalHabitacion({
                 setNumNinos(reservaEncontrada.num_ninos || 0);
                 await resolveClienteYEmpleado(reservaEncontrada);
                 const resConsumos = await consumoService.getByReserva(reservaEncontrada.id);
-                setConsumos(resConsumos.data);
+                consumosData = extraerLista(resConsumos);
+                setConsumos(consumosData);
             }
 
             const futuras = [];
             try {
                 const todasReservas = await reservaService.getAll();
-                const payload = Array.isArray(todasReservas.data)
-                    ? todasReservas.data
-                    : todasReservas.data?.data || [];
+                const payload = extraerLista(todasReservas);
                 const hoy = new Date();
                 hoy.setHours(0, 0, 0, 0);
 
@@ -286,7 +285,7 @@ function ModalHabitacion({
                 for (const resultado of resultados) {
                     if (resultado.status !== 'fulfilled') continue;
                     const { r, res } = resultado.value;
-                    const habsArray = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+                    const habsArray = extraerLista(res);
                     const habEnReserva = habsArray.find(h => h.habitacion_id === habitacion.id);
                     if (habEnReserva) {
                         const fechaEntrada = new Date(r.fecha_entrada);
@@ -302,11 +301,8 @@ function ModalHabitacion({
             } catch { /* silencioso */ }
 
             const resTipos = await consumoService.getTipos();
-            setTiposConsumo(resTipos.data);
-
-            const consumosData = reservaEncontrada
-                ? (await consumoService.getByReserva(reservaEncontrada.id)).data
-                : [];
+            const tiposData = extraerLista(resTipos);
+            setTiposConsumo(tiposData);
 
             setCached(cacheKey, {
                 reserva: reservaEncontrada,
@@ -314,7 +310,7 @@ function ModalHabitacion({
                 clienteDetalle: null,
                 empleadoNombre: '',
                 consumos: consumosData,
-                tiposConsumo: resTipos.data,
+                tiposConsumo: tiposData,
                 reservasFuturas: futuras
             });
         } catch (err) {
@@ -365,7 +361,7 @@ function ModalHabitacion({
                 Number(diasExtra),
                 precioNocheExtension   // <-- enviamos el precio personalizado
             );
-            const datos = res.data;
+            const datos = extraerRecurso(res);
             setReserva(prev => ({
                 ...prev,
                 fecha_salida: datos.nueva_fecha_salida,
@@ -412,8 +408,7 @@ function ModalHabitacion({
         setCargandoAcompanantes(true);
         try {
             const res = await acompananteService.getByReserva(reserva.id);
-            const data = Array.isArray(res.data) ? res.data : Array.isArray(res.data?.data) ? res.data.data : [];
-            setAcompanantes(data);
+            setAcompanantes(extraerLista(res));
         } catch {
             setAcompanantes([]);
         } finally {
@@ -484,7 +479,7 @@ function ModalHabitacion({
             await acompananteService.create(reserva.id, formNuevoAcompanante);
 
             const res = await acompananteService.getByReserva(reserva.id);
-            const lista = Array.isArray(res.data) ? res.data : Array.isArray(res.data?.data) ? res.data.data : [];
+            const lista = extraerLista(res);
             setAcompanantes(lista);
             setMostrandoAcompanantes(true);
             setMostrarModalAcompanante(false);
@@ -589,7 +584,7 @@ function ModalHabitacion({
             });
             setFormServicioPagado(false);
             const resConsumos = await consumoService.getByReserva(reserva.id);
-            setConsumos(resConsumos.data);
+            setConsumos(extraerLista(resConsumos));
             recargarPago();
         } catch (err) {
             console.error('Error agregando servicio', err);
@@ -600,7 +595,7 @@ function ModalHabitacion({
         if (!window.confirm('¿Eliminar este consumo?')) return;
         await consumoService.delete(id);
         const resConsumos = await consumoService.getByReserva(reserva.id);
-        setConsumos(resConsumos.data);
+        setConsumos(extraerLista(resConsumos));
         recargarPago();
     };
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import habitacionService from '../services/habitacionService';
 import { AppButton, PageHeader } from '../components/ui';
+import { extraerLista } from '../utils/apiResponse';
 import '../components/ui/ui.css';
 
 function NuevoHabitacion() {
@@ -26,7 +27,7 @@ function NuevoHabitacion() {
     const cargarTipos = async () => {
         try {
             const res = await habitacionService.getTipos();
-            const lista = Array.isArray(res?.data) ? res.data : [];
+            const lista = extraerLista(res);
             setTipos(lista);
 
             // Preselecciona un tipo valido para evitar envios con tipo_id vacio o invalido.

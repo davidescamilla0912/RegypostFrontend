@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { AppButton, PageHeader } from '../components/ui';
 import empleadoService from '../services/empleadoService';
 import rolService from '../services/rolService';
+import { extraerLista, extraerRecurso } from '../utils/apiResponse';
 
 function EditarEmpleado() {
     const { id } = useParams();
@@ -33,8 +34,8 @@ function EditarEmpleado() {
                     rolService.getAll()
                 ]);
 
-                const empleado = empleadoRes?.data || {};
-                const listaRoles = Array.isArray(rolesRes?.data) ? rolesRes.data : [];
+                const empleado = extraerRecurso(empleadoRes) || {};
+                const listaRoles = extraerLista(rolesRes);
                 setRoles(listaRoles);
 
                 const currentRoles = extraerRoles(empleado, listaRoles);

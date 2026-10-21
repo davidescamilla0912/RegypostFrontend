@@ -5,6 +5,7 @@ import reservaService from '../services/reservaService';
 import consumoService from '../services/consumoService';
 import ModalHabitacion from '../components/ModalHabitacion';
 import { AppButton, PageHeader } from '../components/ui';
+import { extraerLista, extraerRecurso } from '../utils/apiResponse';
 import '../components/ui/ui.css';
 
 const normalizarLista = (res) => (
@@ -65,7 +66,7 @@ function Inventario() {
             } else {
                 res = await inventarioService.getAll();
             }
-            setProductos(res.data);
+            setProductos(extraerLista(res));
         } catch (err) {
             console.error('Error cargando inventario', err);
         } finally {
@@ -157,7 +158,7 @@ function Inventario() {
     const crearProducto = async () => {
     try {
         const res = await inventarioService.create(formData);
-        const productoId = res.data.id;
+        const productoId = extraerRecurso(res)?.id;
         if (formData.stock_inicial > 0) {
             await inventarioService.registrarMovimiento({
                 producto_id: productoId,

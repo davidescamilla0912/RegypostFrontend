@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import parqueaderoService from '../services/parqueaderoService';
 import reservaService from '../services/reservaService';
 import { AppButton, DataTable, PageHeader } from '../components/ui';
+import { extraerLista } from '../utils/apiResponse';
 import '../components/ui/ui.css';
 
 function Parqueadero() {
@@ -31,12 +32,7 @@ function Parqueadero() {
     const cargarReservas = async () => {
         try {
             const res = await reservaService.getAll();
-            const payload = Array.isArray(res.data)
-                ? res.data
-                : Array.isArray(res.data?.data)
-                    ? res.data.data
-                    : [];
-            setReservas(payload);
+            setReservas(extraerLista(res));
         } catch (err) {
             console.error('Error cargando reservas', err);
         }
@@ -50,7 +46,7 @@ function Parqueadero() {
             } else {
                 res = await parqueaderoService.getAll();
             }
-            setRegistros(res.data);
+            setRegistros(extraerLista(res));
         } catch (err) {
             console.error('Error cargando parqueadero', err);
         } finally {
@@ -62,7 +58,7 @@ function Parqueadero() {
         if (!busquedaPlaca) return cargarRegistros();
         try {
             const res = await parqueaderoService.getByPlaca(busquedaPlaca);
-            setRegistros(res.data);
+            setRegistros(extraerLista(res));
         } catch (err) {
             console.error('Error buscando placa', err);
         }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import clienteService from '../services/clienteService';
 import { AppButton, PageHeader } from '../components/ui';
+import { extraerRecurso } from '../utils/apiResponse';
 
 function EditarCliente() {
     const { id } = useParams();
@@ -30,18 +31,19 @@ function EditarCliente() {
     const cargarCliente = async () => {
         try {
             const res = await clienteService.getById(id);
+            const cliente = extraerRecurso(res) || {};
             setFormData({
-                tipo_documento: res.data.tipo_documento || 'CC',
-                numero_documento: res.data.numero_documento || '',
-                nombre: res.data.nombre || '',
-                apellido: res.data.apellido || '',
-                nacionalidad: res.data.nacionalidad || 'Colombiana',
-                telefono: res.data.telefono || '',
-                email: res.data.email || '',
-                direccion: res.data.direccion || '',
-                empresa: res.data.empresa || '',
-                fecha_nacimiento: res.data.fecha_nacimiento || '',
-                notas: res.data.notas || ''
+                tipo_documento: cliente.tipo_documento || 'CC',
+                numero_documento: cliente.numero_documento || '',
+                nombre: cliente.nombre || '',
+                apellido: cliente.apellido || '',
+                nacionalidad: cliente.nacionalidad || 'Colombiana',
+                telefono: cliente.telefono || '',
+                email: cliente.email || '',
+                direccion: cliente.direccion || '',
+                empresa: cliente.empresa || '',
+                fecha_nacimiento: cliente.fecha_nacimiento || '',
+                notas: cliente.notas || ''
             });
         } catch (err) {
             setError('Error cargando cliente');

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AppButton, PageHeader } from '../components/ui';
 import empleadoService from '../services/empleadoService';
 import rolService from '../services/rolService';
+import { extraerLista, extraerRecurso } from '../utils/apiResponse';
 
 function NuevoEmpleado() {
     const [formData, setFormData] = useState({
@@ -28,7 +29,7 @@ function NuevoEmpleado() {
     const cargarRoles = async () => {
         try {
             const res = await rolService.getAll();
-            setRoles(Array.isArray(res.data) ? res.data : []);
+            setRoles(extraerLista(res));
         } catch (err) {
             setError('No se pudieron cargar los roles.');
         }
@@ -73,7 +74,8 @@ function NuevoEmpleado() {
             };
 
             const createRes = await empleadoService.create(payload);
-            const empleadoId = createRes?.data?.id || createRes?.data?.empleado?.id;
+            const creado = extraerRecurso(createRes);
+            const empleadoId = creado?.id || creado?.empleado?.id;
 
             if (empleadoId) {
                 await empleadoService.asignarRol(empleadoId, Number(formData.rol_id));

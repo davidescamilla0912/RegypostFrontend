@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import gastoService from '../services/gastoService';
 import { AppButton, DataTable, PageHeader } from '../components/ui';
+import { extraerLista } from '../utils/apiResponse';
 import '../components/ui/ui.css';
 
 function Gastos() {
@@ -29,7 +30,7 @@ function Gastos() {
     const cargarGastos = async () => {
         try {
             const res = await gastoService.getAll();
-            setGastos(res.data);
+            setGastos(extraerLista(res));
         } catch (err) {
             console.error('Error cargando gastos', err);
         } finally {
@@ -41,7 +42,7 @@ function Gastos() {
         if (!filtroFecha) return cargarGastos();
         try {
             const res = await gastoService.getByFecha(filtroFecha);
-            setGastos(res.data);
+            setGastos(extraerLista(res));
         } catch (err) {
             console.error('Error filtrando por fecha', err);
         }
@@ -52,7 +53,7 @@ function Gastos() {
         if (!cat) return cargarGastos();
         try {
             const res = await gastoService.getByCategoria(cat);
-            setGastos(res.data);
+            setGastos(extraerLista(res));
         } catch (err) {
             console.error('Error filtrando por categoria', err);
         }
