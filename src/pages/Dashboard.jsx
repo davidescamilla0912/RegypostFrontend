@@ -1,9 +1,25 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../components/ui/Dashboard.css';
 
 function Dashboard() {
     const navigate = useNavigate();
-    const empleado = JSON.parse(localStorage.getItem('empleado'));
+    let empleado = null;
+    try {
+        empleado = JSON.parse(localStorage.getItem('empleado') || 'null');
+    } catch {
+        localStorage.removeItem('token');
+        localStorage.removeItem('empleado');
+    }
+
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token || token === 'undefined' || !empleado || typeof empleado !== 'object') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('empleado');
+            navigate('/', { replace: true });
+        }
+    }, [empleado, navigate]);
 
     const modulos = [
         { nombre: 'Clientes', descripcion: 'Gestiona el registro y perfil de clientes.', ruta: '/clientes', color: '#1f6feb' },
