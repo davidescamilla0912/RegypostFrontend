@@ -1,70 +1,75 @@
-# Getting Started with Create React App
+# RegyHotel Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Interfaz web para la administración de un hotel. RegyHotel reúne en un solo panel las tareas diarias de recepción y administración: reservas, clientes, habitaciones, caja, personal e inventario. Este repositorio contiene el frontend; para operar con datos reales necesita conectarse a una instancia compatible de la API backend.
 
-## Available Scripts
+## Capturas de pantalla
 
-In the project directory, you can run:
+Las imágenes se muestran desde `docs/screenshots/`. Añade las capturas de la aplicación con estos nombres para que GitHub las renderice en esta sección:
 
-### `npm start`
+![Panel principal de RegyHotel](docs/screenshots/dashboard.png)
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+![Gestión de reservas de RegyHotel](docs/screenshots/reservas.png)
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Funcionalidades
 
-### `npm test`
+- Panel principal con acceso a los módulos disponibles.
+- Gestión de reservas, clientes y habitaciones.
+- Operaciones de recepción: check-in, check-out y parqueadero.
+- Administración de empleados y control de acceso mediante sesión.
+- Consulta de caja y pagos, gastos e inventario.
+- Interfaz en español con navegación entre módulos.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Tecnologías
 
-### `npm run build`
+- React 18 y Create React App.
+- React Router para navegación.
+- Axios para comunicación HTTP con la API.
+- CSS para estilos de la interfaz.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Requisitos
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- Node.js y npm.
+- Una instancia del backend de RegyHotel para usar las funciones que consultan o modifican datos.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Instalación y ejecución
 
-### `npm run eject`
+Desde la carpeta `frontend/`:
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```bash
+npm install
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Crea un archivo local `.env` en esta carpeta e indica la URL de la API:
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+```env
+REACT_APP_API_URL=http://localhost:5000
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+Inicia la aplicación en modo desarrollo:
 
-## Learn More
+```bash
+npm start
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+Abre [http://localhost:3000](http://localhost:3000). Para compilar la versión de producción:
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```bash
+npm run build
+```
 
-### Code Splitting
+El archivo `.env` contiene configuración local y no debe subirse al repositorio.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Estructura del código
 
-### Analyzing the Bundle Size
+```text
+src/
+  components/  Componentes compartidos y elementos de interfaz
+  hooks/       Hooks de autenticación y estado de reserva
+  pages/       Pantallas y módulos de la aplicación
+  services/    Llamadas a los recursos de la API
+  utils/       Formato, fechas y utilidades comunes
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## Pruebas
 
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Ejecuta `npm test` para iniciar el entorno de pruebas de Create React App.
