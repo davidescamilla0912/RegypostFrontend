@@ -7,6 +7,7 @@
 
 # Local environment
 /.env
+/src/.env
 
 # testing
 /coverage
@@ -20,6 +21,9 @@
 .env.development.local
 .env.test.local
 .env.production.local
+.eslintcache
+/.vercel
+*.log
 
 # Internal project documentation
 /depuracion.md
